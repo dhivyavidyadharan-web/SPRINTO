@@ -18,7 +18,7 @@ export class TokenMeter {
   get estCostUsd() {
     let c = 0;
     for (const k of this.calls) {
-      const smart = k.model.includes("pro");
+      const smart = k.model === config.smartModel || k.model.includes("pro");
       const pin = smart ? 1.25 : 0.3;
       const pout = smart ? 10 : 2.5;
       c += (k.in * pin + k.out * pout) / 1_000_000;
@@ -78,6 +78,7 @@ export async function generateJson<T extends z.ZodType>(opts: GenerateOpts<T>): 
   let lastErr: unknown;
   let prompt = opts.prompt;
   for (let attempt = 0; attempt < 2; attempt++) {
+    const t0 = Date.now();
     const res = await withRetry(() =>
       client().models.generateContent({
         model,
@@ -87,6 +88,7 @@ export async function generateJson<T extends z.ZodType>(opts: GenerateOpts<T>): 
           temperature,
           responseMimeType: "application/json",
           responseJsonSchema: toGeminiSchema(opts.schema),
+          ...thinkingFor(opts.slot),
         },
       }),
     );
@@ -94,7 +96,7 @@ export async function generateJson<T extends z.ZodType>(opts: GenerateOpts<T>): 
     const tin = u?.promptTokenCount ?? 0;
     const tout = (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0);
     opts.meter?.add(opts.purpose, model, tin, tout);
-    console.log(`[gemini] ${opts.purpose} model=${model} in=${tin} out=${tout}`);
+    console.log(`[gemini] ${opts.purpose} model=${model} in=${tin} out=${tout} ms=${Date.now() - t0}`);
     const text = res.text ?? "";
     try {
       const parsed = JSON.parse(text);
@@ -105,6 +107,12 @@ export async function generateJson<T extends z.ZodType>(opts: GenerateOpts<T>): 
     }
   }
   throw new Error(`Gemini ${opts.purpose}: invalid JSON after retry: ${String(lastErr)}`);
+}
+
+/** Thinking level per slot (GEMINI_FAST_THINKING / GEMINI_SMART_THINKING: low|medium|high, empty = model default). */
+function thinkingFor(slot: ModelSlot) {
+  const level = slot === "fast" ? config.fastThinking : config.smartThinking;
+  return level ? { thinkingConfig: { thinkingLevel: level as never } } : {};
 }
 
 async function withRetry<R>(fn: () => Promise<R>, tries = 3): Promise<R> {

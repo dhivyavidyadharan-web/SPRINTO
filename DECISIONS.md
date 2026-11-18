@@ -60,3 +60,10 @@ These are the choices made where the brief left room. Each one is easy to change
 - A pipeline exception puts the company in `INPUT_NEEDED` with reason `pipeline_error: …`, so the queue never stalls. **Retry** re-queues it.
 - The Run page has a per-run DRY_RUN checkbox, stored on `companies.dry_run`. `DRY_RUN=true` in env forces it on everywhere.
 - Git commits use a repo-local identity (`user.name DHIVU-PC`). Change it with `git config user.name` before pushing if you want.
+
+## Live-run findings (2026-11-18, first runs with a real Gemini key)
+- **Models:** the key cannot use `gemini-2.5-*` (retired for new users) or any 3.x Pro. Defaults are now `gemini-3.8-flash` (fast) and `gemini-4-hydrogen` (smart: largest output limit, uses thinking). Change them in env.
+- **Thinking:** with default thinking, Flash spent up to 34 s on one careers page. `GEMINI_FAST_THINKING=low` brings extraction calls to 4–9 s. The smart slot keeps the model default (`GEMINI_SMART_THINKING` empty).
+- **Two requests per qualified company:** Steps 1–3 run in one `/api/pipeline/step` call. A QUALIFIED company is re-queued with `resume_from = contacts`, so Steps 4–7 run in the next call (resumed companies are claimed first). Each request stays well under 60 s.
+- **Security page choice:** the first Rippling run fetched the privacy policy as the "security" page, missed SOC 2 and wrongly QUALIFIED a certified company. Candidates are now real security/trust links, then `/security`, `/trust`, then `trust.<domain>`, and privacy links only last. Re-run: DISQUALIFIED (G3, "SOC 2 Type 2" on /trust/security).
+- **Extraction prompt:** startups and small businesses don't count as enterprise customers (T4), and a bare "Enterprise" nav link isn't an enterprise plan (T3).

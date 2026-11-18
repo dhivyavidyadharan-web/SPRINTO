@@ -16,8 +16,9 @@ Rules:
 - headcountEstimate: only if a number of employees/team size is stated ("200+ employees" → 200).
 - openRolesCount: number of open job listings visible on a careers page (count them if listed).
 - complianceSecurityRoles: exact titles of OPEN job postings in compliance, GRC, security, infosec, privacy or trust.
-- hasEnterprisePlan: true if the page shows an Enterprise tier, SSO/SAML, audit logs, SLA, or "contact sales" for a plan.
-- enterpriseOrRegulatedCustomers: names of large enterprise or regulated (bank, insurer, hospital, government) customers named on the page.
+- hasEnterprisePlan: true if the page shows an Enterprise tier/plan, SSO/SAML, audit logs, SLA, or "contact sales" for a plan. A bare navigation link labelled "Enterprise" is NOT enough; quote the plan or feature text.
+- enterpriseOrRegulatedCustomers: names of LARGE enterprises (well-known, typically 1000+ employees) or regulated institutions (banks, insurers, hospitals, government) named as customers on the page. Startups, small businesses and individuals do NOT count; when unsure, leave it out.
+- Evidence must be a real sentence or phrase from the content, never a run of menu/navigation labels.
 - regulatedVertical: true if the company itself serves fintech, healthcare, HR/payroll, insurance or government data.
 - mentionsGdprOrDpa: true if the page mentions GDPR or a Data Processing Agreement/Addendum.
 - recentEvents: announcements (funding, enterprise launch, expansion, enterprise customer win, security incident, other) with ISO date if stated (else null) and a verbatim evidence quote.

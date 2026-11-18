@@ -14,6 +14,8 @@ export interface DecisionLog {
   codeRationale?: string;
   inputNeededReason?: string | null;
   stopReason?: string;
+  /** First screen of the news page (for undated T6 events when Steps 4–7 resume in a later request). */
+  newsFirstScreen?: string;
   fetchTrail: FetchTrailEntry[];
   httpRequests: number;
   contact?: {

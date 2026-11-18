@@ -25,8 +25,10 @@ function str(name: string, fallback = ""): string {
 export const config = {
   get databaseUrl() { return str("DATABASE_URL"); },
   get geminiKey() { return str("GEMINI_API_KEY"); },
-  get fastModel() { return str("GEMINI_FAST_MODEL", "gemini-2.5-flash"); },
-  get smartModel() { return str("GEMINI_SMART_MODEL", "gemini-2.5-pro"); },
+  get fastModel() { return str("GEMINI_FAST_MODEL", "gemini-3.8-flash"); },
+  get smartModel() { return str("GEMINI_SMART_MODEL", "gemini-4-hydrogen"); },
+  get fastThinking() { return str("GEMINI_FAST_THINKING", "low"); },
+  get smartThinking() { return str("GEMINI_SMART_THINKING", ""); },
   get googleClientId() { return str("GOOGLE_CLIENT_ID"); },
   get googleClientSecret() { return str("GOOGLE_CLIENT_SECRET"); },
   get googleRedirectUri() { return str("GOOGLE_REDIRECT_URI", "http://localhost:3000/api/google/callback"); },

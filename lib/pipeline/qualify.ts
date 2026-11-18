@@ -76,7 +76,16 @@ export async function runQualificationLoop(domain: string, deps: LoopDeps): Prom
 
   // ── Discover candidate pages from homepage links; fall back to common paths.
   const discovered: Discovered = discoverLinks(home.cleaned.links, homepageUrl);
-  const candidates = (t: Exclude<PageType, "homepage">) => (discovered[t]?.map((d) => d.url) ?? fallbackUrls(t, homepageUrl)).slice(0, 2);
+  const candidates = (t: Exclude<PageType, "homepage">) => {
+    const linked = discovered[t]?.map((d) => d.url) ?? [];
+    if (t !== "security") return (linked.length ? linked : fallbackUrls(t, homepageUrl)).slice(0, 2);
+    // Security: a privacy policy is weak evidence for certifications. Prefer real security/trust pages,
+    // then the common paths (/security, /trust), then a trust.<domain> portal, and only then privacy links.
+    const strong = linked.filter((u) => /security|trust|compliance/i.test(u));
+    const weak = linked.filter((u) => !strong.includes(u));
+    const trustSub = `https://trust.${domain}/`;
+    return [...new Set([...strong, ...fallbackUrls(t, homepageUrl), trustSub, ...weak])].slice(0, 3);
+  };
   // Every type is "available" (linked or via up to 2 fallback paths); types that 404 get marked visited.
   const available = new Set<PageType>(["careers", "security", "news", "pricing", "customers", "about"]);
 

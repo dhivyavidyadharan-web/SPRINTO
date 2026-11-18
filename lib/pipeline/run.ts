@@ -24,7 +24,7 @@ export interface StepResult { done: boolean; companyId?: number; domain?: string
 async function claimNext(): Promise<Company | null> {
   const res = await db().execute(sql`
     UPDATE companies SET status = 'PROCESSING', updated_at = now()
-    WHERE id = (SELECT id FROM companies WHERE status = 'QUEUED' ORDER BY updated_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED)
+    WHERE id = (SELECT id FROM companies WHERE status = 'QUEUED' ORDER BY (resume_from IS NULL) ASC, updated_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED)
     RETURNING id`);
   const id = (res.rows?.[0] as { id?: number } | undefined)?.id;
   if (!id) return null;
@@ -71,7 +71,7 @@ async function processCompany(c: Company, log: DecisionLog, meter: TokenMeter): 
     // Resume from Step 4 using stored facts (contact uploaded, or human override of a gate-unknown verdict).
     facts = c.facts as Facts;
     const visited = new Set<PageType>(log.fetchTrail.map((t) => t.pageType));
-    verdict = computeVerdict(facts, { now: new Date(), visited });
+    verdict = computeVerdict(facts, { now: new Date(), visited, newsFirstScreen: log.newsFirstScreen });
     if (c.resumeFrom === "override_qualified" && verdict.verdict !== "QUALIFIED") {
       verdict = { ...verdict, verdict: "QUALIFIED", flags: [...verdict.flags, "human_override"] };
       log.verdict = "QUALIFIED"; log.flags = verdict.flags;
@@ -128,6 +128,12 @@ async function processCompany(c: Company, log: DecisionLog, meter: TokenMeter): 
       await logEvent(c.id, "pipeline", "input_needed", { reason: verdict.inputNeededReason });
       return "INPUT_NEEDED";
     }
+    // QUALIFIED: Steps 4–7 run in the next request (resumed first), so each request stays well under 60 s.
+    log.newsFirstScreen = loop.newsFirstScreen;
+    finalizeTokens(log, meter);
+    await setStatus(c.id, "QUEUED", { decisionLog: log, resumeFrom: "contacts" });
+    await logEvent(c.id, "pipeline", "qualified_continue_outreach", {});
+    return "QUALIFIED";
   }
 
   // ── Step 4: decision-maker

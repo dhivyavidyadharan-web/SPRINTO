@@ -109,8 +109,14 @@ export function evaluateGates(f: Facts, ctx: RubricContext): Record<GateId, Gate
 
   const cert = hasDisqualifyingCert(f.certificationsAchieved.value);
   const certsChecked = ctx.visited.has("security") || (f.certificationsAchieved.value?.length ?? 0) > 0 || (f.certificationsInProgress.value?.length ?? 0) > 0;
+  // Prefer the quote that actually names the disqualifying certificate.
+  const certQuotes = [
+    { evidence: f.certificationsAchieved.evidence, sourceUrl: f.certificationsAchieved.sourceUrl },
+    ...(f.certificationsAchieved.extra ?? []),
+  ].filter((q) => q.evidence);
+  const certQuote = certQuotes.find((q) => DISQUALIFYING_CERTS.some((re) => re.test(q.evidence ?? ""))) ?? certQuotes[0];
   const g3: GateResult = cert
-    ? { status: "fail", evidence: f.certificationsAchieved.evidence, sourceUrl: f.certificationsAchieved.sourceUrl, note: `achieved: ${cert}` }
+    ? { status: "fail", evidence: certQuote?.evidence ?? null, sourceUrl: certQuote?.sourceUrl ?? null, note: `achieved: ${cert}` }
     : certsChecked
       ? { status: "pass", evidence: f.certificationsAchieved.evidence ?? f.certificationsInProgress.evidence, sourceUrl: f.certificationsAchieved.sourceUrl ?? f.certificationsInProgress.sourceUrl, note: "no SOC 2 / ISO 27001 achieved" }
       : { status: "unknown", evidence: null, sourceUrl: null, note: "security/trust page not checked" };
