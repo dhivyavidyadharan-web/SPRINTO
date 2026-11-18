@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { gmailLink } from "@/lib/mail";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { State } from "@/lib/agent/state";
@@ -29,7 +30,7 @@ export default async function Conversations() {
                 </div>
                 {s?.timesProposed?.length ? <div className="text-xs">Offered: {s.timesProposed.map((t) => fmtDate(t)).join(" · ")}</div> : null}
                 {s?.rejectedTimes?.length ? <div className="text-xs text-slate-500">Rejected: {s.rejectedTimes.length}</div> : null}
-                {conv.gmailThreadId ? <a className="text-xs text-brand-700 underline" target="_blank" rel="noreferrer" href={`https://mail.google.com/mail/u/0/#all/${conv.gmailThreadId}`}>Open Gmail thread</a> : <span className="text-xs text-slate-400">dry run (no Gmail thread)</span>}
+                {conv.gmailThreadId ? <a className="text-xs text-brand-700 underline" target="_blank" rel="noreferrer" href={gmailLink(conv.gmailThreadId) ?? "#"}>Open in Gmail</a> : <span className="text-xs text-slate-400">dry run (nothing sent)</span>}
               </div>
               <ol className="max-h-56 space-y-1 overflow-auto text-xs lg:col-span-1">
                 {(s?.history ?? []).slice(-12).reverse().map((h, i) => <li key={i} className="border-l-2 border-slate-200 pl-2"><span className="text-slate-400">{timeAgo(h.ts)}</span> <b>{h.node}</b> — {h.result}</li>)}

@@ -14,7 +14,7 @@ import { findDecisionMaker } from "./contacts";
 import { choosePainPoints, type PainPoint } from "./painPoints";
 import { draftColdEmail } from "./draft";
 import { emptyLog, type DecisionLog } from "./decisionLog";
-import { sendEmail } from "../google/gmail";
+import { sendEmail } from "../mail";
 import { getActiveRules, hookSummary, markRulesApplied } from "../feedback";
 import { startConversation } from "../agent/runtime";
 

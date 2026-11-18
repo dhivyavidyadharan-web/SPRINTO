@@ -6,7 +6,7 @@ An autonomous outbound agent with a hosted dashboard. It scrapes prospect sites,
 
 ## Stack
 
-Next.js 15 (App Router, TypeScript), Tailwind · Neon Postgres + Drizzle · Gemini (`@google/genai`, structured JSON output validated by Zod) · cheerio + robots-parser, with Jina Reader as the fallback for JS-rendered pages · LangGraph.js + Postgres checkpointer · Gmail + Calendar via `googleapis` · Vitest · Vercel Hobby.
+Next.js 15 (App Router, TypeScript), Tailwind · Neon Postgres + Drizzle · Gemini (`@google/genai`, structured JSON output validated by Zod) · cheerio + robots-parser, with Jina Reader as the fallback for JS-rendered pages · LangGraph.js + Postgres checkpointer · Gmail via App Password (nodemailer SMTP + imapflow IMAP) · Calendly · Vitest · Vercel Hobby.
 
 ## Where things live
 
@@ -18,7 +18,8 @@ Next.js 15 (App Router, TypeScript), Tailwind · Neon Postgres + Drizzle · Gemi
 | `lib/pipeline/*` | Steps 1–7: the qualify loop, extract, explain, contacts, pain points, draft + quality gate, `run.ts` orchestrator, decision log. |
 | `lib/agent/*` | LangGraph reply/scheduling agent: state, tools + retry table, graph, runtime (checkpointer, reply detection, daily jobs). |
 | `lib/feedback/*` | Rule distillation, dedupe, the 10-rule cap, hook-outcome summary. |
-| `lib/google/*` | OAuth (encrypted refresh token), Gmail send/read, Calendar free/busy + booking. |
+| `lib/mail/*` | Gmail via App Password: SMTP send (MY_EMAIL lock), IMAP reply detection. |
+| `lib/calendar/*` | Slot maths (business hours, timezone) + Calendly availability/booking. |
 | `app/*` | Dashboard pages and API routes. |
 
 ## Local setup
@@ -29,7 +30,7 @@ cp .env.example .env.local      # fill it in (see below)
 npm run db:push                 # creates tables on Neon (or: run drizzle/0000_init.sql)
 npm run models                  # lists Gemini models for your key; set GEMINI_FAST_MODEL / GEMINI_SMART_MODEL
 npm test                        # 67 tests
-npm run dev                     # http://localhost:3000 → log in with DASHBOARD_PASSWORD
+npm run dev                     # http://localhost:3000 (login only if DASHBOARD_PASSWORD is set)
 ```
 
 To try Steps 1–3 without a database (prints the decision trail):
@@ -45,18 +46,20 @@ npm run try -- linear.app posthog.com       # needs GEMINI_API_KEY
 2. Copy the **pooled** connection string into `DATABASE_URL`.
 3. Run `npm run db:push`. The LangGraph checkpointer creates its own tables on first use.
 
-### Google Cloud (Gmail + Calendar)
+### Gmail (App Password) — no Google Cloud project needed
 
-1. Create a project at console.cloud.google.com.
-2. Enable the **Gmail API** and the **Google Calendar API**.
-3. Set up the **OAuth consent screen**: type External, status **Testing**, and add your own address as a **test user**.
-4. Under **Credentials**, create an **OAuth client ID** (Web application) with these authorised redirect URIs:
-   - `http://localhost:3000/api/google/callback`
-   - `https://<your-app>.vercel.app/api/google/callback`
-5. Put the client ID and secret in `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. Set `GOOGLE_REDIRECT_URI` to match the environment.
-6. In the dashboard, go to **Settings → Connect Google**. The refresh token is stored AES-256-GCM-encrypted in `settings`. The key comes from `ENCRYPTION_KEY`, or from `DASHBOARD_PASSWORD` if that isn't set.
+1. Your Google account needs **2-Step Verification** on (myaccount.google.com → Security).
+2. Go to **myaccount.google.com/apppasswords**, create one named `sprinto-agent`, and copy the 16-character password.
+   (On a Google Workspace / school account the admin may have disabled App Passwords; use a personal Gmail as `MY_EMAIL` in that case.)
+3. In Gmail → Settings → **Forwarding and POP/IMAP** → make sure **IMAP is enabled**.
+4. Set `GMAIL_APP_PASSWORD` (spaces are fine). `GMAIL_USER` defaults to `MY_EMAIL`.
 
-Scopes: `gmail.modify`, `calendar`.
+The agent **sends** over SMTP (`smtp.gmail.com:465`) and **reads replies** over IMAP: any message from you whose `In-Reply-To`/`References` points at one of the agent's emails is treated as the prospect's reply. Settings shows a live SMTP + IMAP check.
+
+### Calendly (scheduling)
+
+- `CALENDLY_URL` — your event link (e.g. `https://calendly.com/you/30min`). Proposals and confirmations include it.
+- `CALENDLY_TOKEN` (optional) — Calendly → Integrations → **API & Webhooks** → Personal Access Token. With it, proposed times come from your **real Calendly availability**, and on confirmation the agent tries Calendly's booking API (invitee = `MY_EMAIL`). If your plan doesn't allow API booking, the confirmation email carries the slot's Calendly link so the invite can be locked in.
 
 ### Gemini
 
@@ -70,9 +73,9 @@ git push -u origin main
 ```
 
 1. In Vercel, use **Add New → Project → Import** the repo. Framework: Next.js.
-2. Add every variable from `.env.example` under **Settings → Environment Variables**, with `GOOGLE_REDIRECT_URI=https://<app>.vercel.app/api/google/callback`.
+2. Add every variable from `.env.example` under **Settings → Environment Variables**.
 3. Set `CRON_SECRET` (Vercel sends it as `Authorization: Bearer …` to `/api/cron/daily`). `vercel.json` schedules it daily at 03:30 UTC (09:00 IST).
-4. Deploy, open the app, log in, then **Settings → Connect Google**.
+4. Deploy and open the app; **Settings** should show SMTP ok / IMAP ok.
 
 Hobby crons run only once a day, so replies are also checked:
 - by **Check replies now** on the Overview,
@@ -93,4 +96,4 @@ Hobby crons run only once a day, so replies are also checked:
 - Only `MY_EMAIL` ever receives email (enforced in `sendEmail`, unit-tested). Every email ends with a footer naming the intended recipient.
 - With `DRY_RUN=true` (env, or the per-run checkbox), emails are drafted and stored but Gmail is never called.
 - Bot walls, logins and CAPTCHAs are detected and never bypassed. robots.txt is checked before every URL.
-- The dashboard is password-gated (signed httpOnly cookie). Cron uses `CRON_SECRET`. All keys stay server-side.
+- The dashboard is password-gated when `DASHBOARD_PASSWORD` is set (signed httpOnly cookie); set it before sharing a public URL. Cron uses `CRON_SECRET`. All keys stay server-side.

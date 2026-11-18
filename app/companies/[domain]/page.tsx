@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { gmailLink } from "@/lib/mail";
 import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -136,7 +137,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ domain
         <Card title="Conversation" right={<Link className="text-xs text-brand-700 underline" href="/conversations">All conversations</Link>}>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-2">
-              <div className="text-sm">Stage: <b>{conv.stage}</b> {conv.gmailThreadId && <a className="ml-2 text-xs text-brand-700 underline" target="_blank" rel="noreferrer" href={`https://mail.google.com/mail/u/0/#all/${conv.gmailThreadId}`}>Open Gmail thread</a>}</div>
+              <div className="text-sm">Stage: <b>{conv.stage}</b> {conv.gmailThreadId && <a className="ml-2 text-xs text-brand-700 underline" target="_blank" rel="noreferrer" href={gmailLink(conv.gmailThreadId) ?? "#"}>Open in Gmail</a>}</div>
               {meetings.map((m) => <div key={m.id} className="text-sm font-semibold text-brand-800">📅 Meeting {fmtDate(m.startAt)}</div>)}
               {state && !state.done && !state.inputNeeded && <SimulateReply companyId={c.id} />}
               <details><summary className="cursor-pointer text-xs text-slate-600">State object</summary><pre className="mono max-h-96 overflow-auto rounded bg-slate-50 p-2">{JSON.stringify({ ...state, history: undefined }, null, 2)}</pre></details>

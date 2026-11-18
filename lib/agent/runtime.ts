@@ -9,8 +9,9 @@ import { generateJson } from "../llm/gemini";
 import { buildGraph } from "./graph";
 import type { AgentDeps, ClassifyResult } from "./tools";
 import type { ResumeEvent, State } from "./state";
-import { sendEmail, getThreadMessages, stripQuoted } from "../google/gmail";
-import { computeOpenSlots, createEvent, findCompanyEvent, formatSlot, freeBusy, pickTwoSlots, classifyGoogleError, zonedParts } from "../google/calendar";
+import { sendEmail, fetchReplies, stripQuoted } from "../mail";
+import { computeOpenSlots, formatSlot, pickTwoSlots, zonedParts } from "../calendar/slots";
+import { bookSlot, busyIntervals, classifyCalendarError, slotLink } from "../calendar/calendly";
 import { draftFollowup } from "../pipeline/draft";
 import type { DecisionLog } from "../pipeline/decisionLog";
 import { computeVerdict, type PageType } from "../rubric";
@@ -46,10 +47,6 @@ async function companyContext(companyId: number) {
   return c;
 }
 
-function threadLink(s: State) {
-  return s.gmailThreadId ? `https://mail.google.com/mail/u/0/#all/${s.gmailThreadId}` : "(dry run — no Gmail thread)";
-}
-
 export function realDeps(): AgentDeps {
   return {
     now: () => new Date(),
@@ -71,7 +68,7 @@ confidence: 0..1. Return JSON only.`,
         prompt: `Offered slots (ISO): ${JSON.stringify(s.timesProposed)}\nOffered (human-readable): ${s.timesProposed.map((t) => formatSlot(t)).join(" | ") || "none yet"}\n\nReply:\n"""${replyText.slice(0, 3000)}"""`,
       }) as Promise<ClassifyResult>;
     },
-    freeBusy,
+    freeBusy: busyIntervals,
     computeOpenSlots: (startIso, endIso, busy, now) => computeOpenSlots({ startIso, endIso, busy, now }),
     isSlotAcceptable(slotIso, busy, now) {
       const s = new Date(slotIso);
@@ -88,8 +85,17 @@ confidence: 0..1. Return JSON only.`,
     },
     pickTwoSlots: (slots, rejected) => pickTwoSlots(slots, rejected),
     formatSlot: (iso) => formatSlot(iso),
-    findEvent: async (companyId) => { const e = await findCompanyEvent(companyId); return e?.id ? { id: e.id } : null; },
-    createEvent: (s, slotIso) => createEvent({ companyId: s.companyId, startIso: slotIso, contactName: s.contactName, company: s.companyName, threadLink: threadLink(s) }),
+    // Double-booking guard: a meeting row for this company means it is already booked.
+    findEvent: async (companyId) => {
+      const [m] = await db().select().from(schema.meetings).where(eq(schema.meetings.companyId, companyId));
+      return m ? { id: m.calendarEventId ?? `meeting-${m.id}` } : null;
+    },
+    async createEvent(s, slotIso) {
+      const r = await bookSlot({ slotIso, contactName: s.contactName, companyId: s.companyId });
+      await logEvent(s.companyId, "agent", "calendly_booking", { mode: r.mode, eventId: r.eventId, note: r.note });
+      return { eventId: r.eventId, endIso: new Date(new Date(slotIso).getTime() + config.meetingMinutes * 60_000).toISOString() };
+    },
+    bookingLink: (slotIso) => (slotIso ? slotLink(slotIso) : config.calendlyUrl || null),
     async send(s, kind, body) {
       const c = await companyContext(s.companyId);
       const log = c.decisionLog as DecisionLog;
@@ -154,7 +160,7 @@ confidence: 0..1. Return JSON only.`,
       const { history, ...rest } = s;
       await db().update(schema.conversations).set({ state: { ...rest, history: history.slice(-60) }, lastActivityAt: new Date(s.lastActivityAt) }).where(eq(schema.conversations.companyId, s.companyId));
     },
-    errorKind: classifyGoogleError,
+    errorKind: classifyCalendarError,
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     config: {
       meetingMinutes: config.meetingMinutes, bookingWindowDays: config.bookingWindowDays, maxRounds: config.maxNegotiationRounds,
@@ -219,29 +225,41 @@ export async function getConversationState(companyId: number) {
   return { values: st?.values as State | undefined, next: st?.next ?? [] };
 }
 
-/** Section 6.5: detect prospect replies in open Gmail threads and resume their graphs. */
+/**
+ * Section 6.5: detect prospect replies over IMAP and resume their graphs.
+ * A message from MY_EMAIL whose In-Reply-To/References contains one of the agent's Message-IDs
+ * and is not itself an agent message (or already processed) is a prospect reply.
+ */
 export async function checkReplies() {
   const open = await db().select().from(schema.conversations).where(isNotNull(schema.conversations.gmailThreadId));
-  const results: { companyId: number; processed: number; error?: string }[] = [];
+  const live: { companyId: number; ids: Set<string>; since: Date }[] = [];
   for (const conv of open) {
     const [c] = await db().select().from(schema.companies).where(eq(schema.companies.id, conv.companyId));
     if (!c || ["MEETING_BOOKED", "BACKUP", "DO_NOT_CONTACT"].includes(c.status)) continue;
+    const { values, next } = await getConversationState(conv.companyId);
+    if (!values || !next.length || values.inputNeeded || values.done) continue;
+    live.push({ companyId: conv.companyId, ids: new Set([...values.agentSentMessageIds, ...values.processedMessageIds, conv.gmailThreadId!]), since: conv.createdAt });
+  }
+  if (!live.length) return [];
+  const known = new Set(live.flatMap((l) => [...l.ids]));
+  const since = new Date(Math.min(...live.map((l) => l.since.getTime())));
+  const replies = await fetchReplies(since, known);
+  const results: { companyId: number; processed: number; error?: string }[] = [];
+  for (const l of live) {
+    let processed = 0;
     try {
-      const { values, next } = await getConversationState(conv.companyId);
-      if (!values || !next.length || values.inputNeeded) continue;
-      const msgs = (await getThreadMessages(conv.gmailThreadId!)).sort((a, b) => a.internalDate - b.internalDate);
-      let processed = 0;
-      for (const m of msgs) {
-        const cur = (await getConversationState(conv.companyId)).values!;
+      for (const m of replies) {
+        const refs = [m.inReplyTo, ...m.references].filter(Boolean) as string[];
+        if (!refs.some((r) => l.ids.has(r))) continue;
+        const cur = (await getConversationState(l.companyId)).values!;
         if (cur.agentSentMessageIds.includes(m.id) || cur.processedMessageIds.includes(m.id)) continue;
         if (cur.inputNeeded || cur.done) break;
-        const text = stripQuoted(m.text);
-        await resumeConversation(conv.companyId, { type: "reply", replyText: text || "(empty reply)", messageId: m.id, receivedAt: new Date(m.internalDate).toISOString(), rfcMessageId: m.rfcMessageId });
+        await resumeConversation(l.companyId, { type: "reply", replyText: stripQuoted(m.text) || "(empty reply)", messageId: m.id, receivedAt: m.date.toISOString(), rfcMessageId: m.id });
         processed++;
       }
-      results.push({ companyId: conv.companyId, processed });
+      results.push({ companyId: l.companyId, processed });
     } catch (e) {
-      results.push({ companyId: conv.companyId, processed: 0, error: String((e as Error)?.message ?? e).slice(0, 200) });
+      results.push({ companyId: l.companyId, processed, error: String((e as Error)?.message ?? e).slice(0, 200) });
     }
   }
   return results;

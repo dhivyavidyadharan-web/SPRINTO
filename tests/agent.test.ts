@@ -3,7 +3,7 @@ import { Command, MemorySaver } from "@langchain/langgraph";
 import { buildGraph } from "@/lib/agent/graph";
 import type { AgentDeps, ClassifyResult } from "@/lib/agent/tools";
 import type { ResumeEvent, State } from "@/lib/agent/state";
-import { computeOpenSlots, pickTwoSlots } from "@/lib/google/calendar";
+import { computeOpenSlots, pickTwoSlots } from "@/lib/calendar/slots";
 
 const NOW = new Date("2026-11-18T04:00:00Z"); // Wed 09:30 IST
 const DAY = 86_400_000;
@@ -25,6 +25,7 @@ function harness(opts: { classify?: (ClassifyResult | ((s: State) => ClassifyRes
     isSlotAcceptable: (slot, busy) => !busy.some((b) => b.start <= slot && b.end > slot),
     pickTwoSlots: (slots, rej) => pickTwoSlots(slots, rej, "Asia/Kolkata"),
     formatSlot: (iso) => iso,
+    bookingLink: () => null,
     findEvent: async () => (events[0] ? { id: events[0].id } : null),
     createEvent: async (_s, slot) => {
       createCalls++;

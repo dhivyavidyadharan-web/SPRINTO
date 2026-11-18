@@ -7,9 +7,9 @@ const firstName = (s: State) => (s.contactName || "there").split(" ")[0];
 // ───────────── Short, deterministic reply templates (no invented facts) ─────────────
 export const templates = {
   propose: (s: State, d: AgentDeps, slots: string[], taken: boolean) =>
-    `Hi ${firstName(s)},\n\n${taken ? "Apologies — that slot was just taken on my side. " : s.negotiationRound > 0 ? "No problem. " : "Great to hear from you. "}Would either of these work for a 30-minute call?\n\n- ${slots.map((x) => d.formatSlot(x)).join("\n- ")}\n\nIf neither suits, just send a time that works for you.\n\n${d.config.senderName}`.replace("30-minute", `${d.config.meetingMinutes}-minute`),
+    `Hi ${firstName(s)},\n\n${taken ? "Apologies — that slot was just taken on my side. " : s.negotiationRound > 0 ? "No problem. " : "Great to hear from you. "}Would either of these work for a 30-minute call?\n\n- ${slots.map((x) => d.formatSlot(x)).join("\n- ")}\n\nIf neither suits, just send a time that works for you${d.bookingLink(null) ? ` or pick one here: ${d.bookingLink(null)}` : ""}.\n\n${d.config.senderName}`.replace("30-minute", `${d.config.meetingMinutes}-minute`),
   confirm: (s: State, d: AgentDeps, slot: string) =>
-    `Hi ${firstName(s)},\n\nConfirmed for ${d.formatSlot(slot)}. I've put it on the calendar — looking forward to it.\n\n${d.config.senderName}`,
+    `Hi ${firstName(s)},\n\nConfirmed for ${d.formatSlot(slot)} — looking forward to it.${d.bookingLink(slot) ? `\n\nTo get the calendar invite, please lock in that time here: ${d.bookingLink(slot)}` : ""}\n\n${d.config.senderName}`,
   decline: (s: State, d: AgentDeps) =>
     `Hi ${firstName(s)},\n\nThanks for letting me know — completely understand. I won't follow up further for now. If audit readiness becomes a priority later, I'm happy to help.\n\n${d.config.senderName}`,
   clarify: (s: State, d: AgentDeps) =>

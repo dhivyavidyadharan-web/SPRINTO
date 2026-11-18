@@ -1,6 +1,5 @@
-import { google } from "googleapis";
+/** Pure time-slot helpers (timezone math, business-hours grid, slot picking). */
 import { config } from "../env";
-import { authedClient, GoogleNotConnectedError } from "./auth";
 
 // ───────────── Timezone helpers (no external deps) ─────────────
 function tzOffsetMs(date: Date, tz: string): number {
@@ -81,47 +80,3 @@ export function pickTwoSlots(slots: string[], rejected: string[], tz = config.ti
   return picks;
 }
 
-// ───────────── API wrappers ─────────────
-type CalApi = ReturnType<typeof google.calendar>;
-let calFactory: () => Promise<CalApi> = async () => google.calendar({ version: "v3", auth: await authedClient() });
-export function __setCalendarFactory(f: () => Promise<CalApi>) { calFactory = f; }
-
-export type CalendarErrorKind = "auth" | "transient" | "other";
-export function classifyGoogleError(e: unknown): CalendarErrorKind {
-  if (e instanceof GoogleNotConnectedError) return "auth";
-  const code = (e as { code?: number })?.code;
-  const msg = String((e as Error)?.message ?? e);
-  if (code === 401 || code === 403 || /invalid_grant|unauthorized|insufficient/i.test(msg)) return "auth";
-  if ((typeof code === "number" && code >= 500) || /timeout|ETIMEDOUT|ECONNRESET|fetch failed|socket/i.test(msg)) return "transient";
-  return "other";
-}
-
-export async function freeBusy(startIso: string, endIso: string) {
-  const cal = await calFactory();
-  const res = await cal.freebusy.query({ requestBody: { timeMin: startIso, timeMax: endIso, timeZone: config.timezone, items: [{ id: "primary" }] } });
-  return (res.data.calendars?.primary?.busy ?? []).map((b) => ({ start: b.start!, end: b.end! }));
-}
-
-export async function findCompanyEvent(companyId: number) {
-  const cal = await calFactory();
-  const res = await cal.events.list({ calendarId: "primary", privateExtendedProperty: [`sprintoCompanyId=${companyId}`], timeMin: new Date(Date.now() - 86_400_000).toISOString(), singleEvents: true, maxResults: 5 });
-  return (res.data.items ?? []).find((e) => e.status !== "cancelled") ?? null;
-}
-
-export async function createEvent(p: { companyId: number; startIso: string; contactName: string; company: string; threadLink: string }) {
-  const cal = await calFactory();
-  const end = new Date(new Date(p.startIso).getTime() + config.meetingMinutes * 60_000).toISOString();
-  const res = await cal.events.insert({
-    calendarId: "primary",
-    sendUpdates: "none",
-    requestBody: {
-      summary: `Sprinto intro — ${p.contactName}, ${p.company}`,
-      description: `Booked autonomously by the Sprinto outbound agent (live test).\nThread: ${p.threadLink}`,
-      start: { dateTime: p.startIso, timeZone: config.timezone },
-      end: { dateTime: end, timeZone: config.timezone },
-      attendees: [{ email: config.myEmail }],
-      extendedProperties: { private: { sprintoCompanyId: String(p.companyId) } },
-    },
-  });
-  return { eventId: res.data.id!, endIso: end };
-}

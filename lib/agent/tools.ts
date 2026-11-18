@@ -7,10 +7,10 @@
 import type { State } from "./state";
 
 export const TOOL_DESCRIPTIONS = {
-  checkCalendar: "Checks free/busy on my Google Calendar and returns open MEETING_MINUTES slots within business hours (TIMEZONE), weekdays only. Use when the prospect is interested, proposes a time, or counter-proposes. Do not use to list existing meetings, and never for dates beyond BOOKING_WINDOW_DAYS (max 30). Returns { status: 'free'|'busy'|'no_calendar_access', slots: string[] }.",
+  checkCalendar: "Checks my availability (Calendly available times, which reflect my connected calendar) and returns open MEETING_MINUTES slots within business hours (TIMEZONE), weekdays only. Use when the prospect is interested, proposes a time, or counter-proposes. Do not use to list existing meetings, and never for dates beyond BOOKING_WINDOW_DAYS (max 30). Returns { status: 'free'|'busy'|'no_calendar_access', slots: string[] }.",
   sendEmail: "Sends a reply in the existing Gmail thread, always to MY_EMAIL. Use to propose times, confirm a booking, ask one clarifying question, acknowledge a decline, or send a follow-up. Never starts a new thread, never emails anyone except MY_EMAIL. Returns { status: 'sent'|'failed', messageId }.",
   proposeTimes: "Picks 2 open slots on different days that are not in rejectedTimes, drafts a short reply offering them, and sends it. Use only after checkCalendar returned free slots in this round. Do not use when meetingStatus is confirmed. Returns { timesProposed: [iso, iso], messageId }.",
-  bookMeeting: "Creates a Calendar event on my calendar for the agreed slot; title 'Sprinto intro — {contactName}, {company}', description includes the thread link; the only attendee is MY_EMAIL. Use only when the prospect confirmed a slot we offered, or proposed a slot that checkCalendar just confirmed free. Do not use on a tentative 'maybe'. Before creating, search for an existing event tagged with this companyId to prevent double-booking. Returns { status: 'booked'|'slot_taken'|'failed', eventId }.",
+  bookMeeting: "Books the agreed slot through Calendly (Scheduling API, invitee = MY_EMAIL in live test); if the plan does not allow API booking, confirms by email and sends the Calendly link for that slot. Use only when the prospect confirmed a slot we offered, or proposed a slot that checkCalendar just confirmed free. Do not use on a tentative 'maybe'. Before booking, checks for an existing meeting for this company to prevent double-booking. Returns { status: 'booked'|'slot_taken'|'failed', eventId }.",
   updateCrm: "Updates the company's status, conversation stage and events timeline in the database. Use at every stage change. Returns { status: 'logged'|'failed' }.",
   flagInputNeeded: "Moves the conversation to the dashboard's Input needed column with a clear reason and pauses the thread. Use only for the cases listed in Section 8 (no time after 3 rounds, unclear after one clarification, calendar/Google problem after retries, follow-up failed quality gate). Returns { status: 'flagged' }.",
 } as const;
@@ -44,6 +44,8 @@ export interface AgentDeps {
   formatSlot(iso: string): string;
   findEvent(companyId: number): Promise<{ id: string } | null>;
   createEvent(s: State, slotIso: string): Promise<{ eventId: string; endIso: string }>;
+  /** Calendly link for a slot's day (or the general link when slotIso is null); null if not configured. */
+  bookingLink(slotIso: string | null): string | null;
   send(s: State, kind: string, body: string): Promise<{ status: "sent" | "failed" | "dry_run"; messageId: string | null; rfcMessageId?: string | null; error?: string }>;
   draftFollowup(s: State, n: 1 | 2): Promise<{ body: string; passed: boolean; failures: string[][] }>;
   draftFromInstruction(s: State, instruction: string): Promise<string>;

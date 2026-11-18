@@ -29,15 +29,18 @@ export const config = {
   get smartModel() { return str("GEMINI_SMART_MODEL", "gemini-4-hydrogen"); },
   get fastThinking() { return str("GEMINI_FAST_THINKING", "low"); },
   get smartThinking() { return str("GEMINI_SMART_THINKING", "low"); },
-  get googleClientId() { return str("GOOGLE_CLIENT_ID"); },
-  get googleClientSecret() { return str("GOOGLE_CLIENT_SECRET"); },
-  get googleRedirectUri() { return str("GOOGLE_REDIRECT_URI", "http://localhost:3000/api/google/callback"); },
   get myEmail() { return str("MY_EMAIL").toLowerCase(); },
+  /** Gmail account used for SMTP/IMAP (defaults to MY_EMAIL). */
+  get gmailUser() { return str("GMAIL_USER") || str("MY_EMAIL"); },
+  /** Google App Password (16 chars; spaces are ignored). */
+  get gmailAppPassword() { return str("GMAIL_APP_PASSWORD").replace(/\s+/g, ""); },
+  get calendlyUrl() { return str("CALENDLY_URL"); },
+  get calendlyToken() { return str("CALENDLY_TOKEN"); },
   get senderName() { return str("SENDER_NAME", "Sprinto Growth"); },
   get senderTitle() { return str("SENDER_TITLE", "Growth, Sprinto"); },
   get dashboardPassword() { return str("DASHBOARD_PASSWORD"); },
-  /** Key for encrypting the Google refresh token: ENCRYPTION_KEY, else DASHBOARD_PASSWORD, else GOOGLE_CLIENT_SECRET (always set when Google is used). */
-  get encryptionKey() { return str("ENCRYPTION_KEY") || str("DASHBOARD_PASSWORD") || str("GOOGLE_CLIENT_SECRET"); },
+  /** Key for encrypting secrets stored in the settings table. */
+  get encryptionKey() { return str("ENCRYPTION_KEY") || str("DASHBOARD_PASSWORD") || str("GMAIL_APP_PASSWORD"); },
   get passwordGate() { return !!str("DASHBOARD_PASSWORD"); },
   get cronSecret() { return str("CRON_SECRET"); },
   get jinaKey() { return str("JINA_API_KEY"); },
@@ -83,6 +86,10 @@ export function publicConfig() {
     MAX_ACTIVE_RULES: config.maxActiveRules,
     DRY_RUN_ENV: config.dryRunEnv,
     DASHBOARD_PASSWORD_GATE: config.passwordGate ? "on" : "off (dashboard is open)",
+    GMAIL_USER: config.gmailUser,
+    GMAIL_APP_PASSWORD_SET: !!config.gmailAppPassword,
+    CALENDLY_URL: config.calendlyUrl || "(not set)",
+    CALENDLY_TOKEN_SET: !!config.calendlyToken,
     JINA_API_KEY_SET: !!config.jinaKey,
     HUNTER_API_KEY_SET: !!config.hunterKey,
   };
