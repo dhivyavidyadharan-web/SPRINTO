@@ -1,0 +1,49 @@
+{
+  "name": "sprinto-outbound-agent",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "models": "tsx scripts/list-models.ts",
+    "try": "tsx scripts/try-pipeline.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^3.6.0",
+    "@langchain/core": "^1.4.1",
+    "@langchain/langgraph": "^1.7.5",
+    "@langchain/langgraph-checkpoint-postgres": "^1.1.4",
+    "@neondatabase/serverless": "^1.2.1",
+    "cheerio": "^1.2.0",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.4",
+    "googleapis": "^190.0.0",
+    "lucide-react": "^1.75.0",
+    "next": "^15.5.29",
+    "pg": "^8.23.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "robots-parser": "^3.0.1",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.6.2",
+    "dotenv": "^18.0.10",
+    "drizzle-kit": "^0.31.11",
+    "postcss": "^8.5.33",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  }
+}
