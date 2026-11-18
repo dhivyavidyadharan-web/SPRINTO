@@ -32,6 +32,9 @@ export function cleanHtml(html: string, baseUrl: string): Cleaned {
 
   // 1. Remove non-content.
   $("script, style, noscript, svg, iframe, template").remove();
+  // Keep word boundaries between adjacent inline/block elements when reading .text().
+  $("a, li, p, div, span, h1, h2, h3, h4, h5, h6, td, th, dt, dd, button, label, section, article").append(" ");
+  $("br").replaceWith(" ");
 
   // 2. Capture footer text separately (cert badges & GDPR mentions live there).
   const footerText = $("footer, [role=contentinfo]").map((_, el) => $(el).text()).get().join(" ").replace(/\s+/g, " ").trim().slice(0, 2000);

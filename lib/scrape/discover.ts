@@ -35,11 +35,22 @@ export function discoverLinks(links: { href: string; text: string }[], homepageU
         if (!found.includes(s)) found.push(s);
       }
     }
-    // Ranking: for security prefer trust subdomain / "security" / "trust" over "privacy".
-    if (type === "security") found.sort((a, b) => secScore(b) - secScore(a));
+    // Ranking: section roots and exact keyword segments first (e.g. /changelog over /changelog/2026-...);
+    // for security prefer trust subdomain / "security" / "trust" over "privacy".
+    found.sort((a, b) => rootScore(b, pat.keywords) - rootScore(a, pat.keywords) || (type === "security" ? secScore(b) - secScore(a) : 0));
     if (found.length) out[type] = found.slice(0, 2).map((url) => ({ url, how: "link" as const }));
   }
   return out;
+}
+
+function rootScore(u: string, kw: RegExp) {
+  try {
+    const url = new URL(u);
+    const segs = url.pathname.split("/").filter(Boolean);
+    const exact = segs.length > 0 && new RegExp(`^(${kw.source})$`, "i").test(segs[0]) ? 3 : 0;
+    const sub = /^(trust|security|jobs|careers)\./i.test(url.hostname) ? 3 : 0;
+    return exact + sub - segs.length;
+  } catch { return 0; }
 }
 
 function secScore(u: string) {

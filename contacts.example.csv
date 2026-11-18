@@ -1,0 +1,4 @@
+domain,first_name,last_name,title,email,linkedin_url
+example.com,Jane,Doe,CTO,jane@example.com,https://www.linkedin.com/in/janedoe
+example.com,John,Roe,VP Sales,john@example.com,
+example.com,,,,info@example.com,

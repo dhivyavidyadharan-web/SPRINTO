@@ -1,0 +1,62 @@
+# Decisions & assumptions
+
+These are the choices made where the brief left room. Each one is easy to change. Thresholds live in `lib/rubric.ts` or in env.
+
+## Stack / platform
+- **Next.js 15**, not 16: v16 renames `middleware.ts` to `proxy.ts`. 15 keeps the brief's `middleware.ts` password gate as-is. **TypeScript 5** is pinned because Next's type-check doesn't support TS 7 yet.
+- **Tailwind 3 with hand-written shadcn-style primitives** (`components/ui.tsx`) instead of the interactive shadcn CLI. Same look, no generator step.
+- **Drizzle over Neon HTTP** (`drizzle-orm/neon-http`) for app queries. The LangGraph checkpointer uses `pg` against the same `DATABASE_URL`, as `PostgresSaver` requires.
+- **Gemini defaults** are `gemini-2.5-flash` and `gemini-2.5-pro`. Search results disagreed on the newest model names, so both are env-driven and `npm run models` lists what your key can use. Structured output uses `responseJsonSchema`, generated from the Zod schemas (`z.toJSONSchema`), and every response is Zod-validated with one retry. Temperatures: 0 for extraction/classification, 0.7 for drafting, 0.2–0.3 for explanations and pain points.
+- **Cost estimate** uses approximate list prices (Flash about $0.30/$2.50 per M tokens, Pro about $1.25/$10). It's only an indicator.
+
+## Scraping
+- **Grounding:** a fact is kept only if its evidence quote appears (after normalisation) in the page text, footer or badge hints. This turns "never infer" into a code guarantee. Values the model can't quote are dropped to `null`.
+- **Hard stops:** a bot wall, login or CAPTCHA on the **homepage** makes the company `UNREACHABLE`. On a **sub-page**, the loop stops fetching (no bypass) and decides with what it has. Jina is never used to get past a wall; it's only for thin, JS-rendered pages under 200 words.
+- **CAPTCHA detection** needs a CAPTCHA widget **plus** an HTTP error or a tiny page. Many healthy sites embed reCAPTCHA in contact forms, and those shouldn't be marked unreachable.
+- **Page availability:** every page type counts as available, either as a discovered link or via up to 2 common fallback paths. A type that 404s still counts as visited, so the loop moves on. Discovery prefers section roots (`/changelog` over `/changelog/2026-…`) and, for security, trust subdomains or `/trust` over `/privacy`.
+- **Cache:** non-homepage pages are reused if fetched successfully in the last 7 days. The homepage is always refetched because its links drive discovery.
+- **robots.txt** fetches count toward `MAX_HTTP_REQUESTS_PER_COMPANY`.
+
+## Qualification
+- **"Timing decided"** in the sufficiency check means at least one T-signal **fired**, or every T-source page (careers, security, news, pricing, customers) has been visited.
+- **G3 status:** `pass` when the security page was visited, or certifications were found anywhere, and none is SOC 2 / ISO 27001. Otherwise `unknown` plus the `cert_status_unverified` flag. Any SOC 2 type, or ISO 27001, fails G3. HIPAA alone does not.
+- **G4 unknown** (security page not visited) is treated as "no tool" with no flag, as the brief says.
+- **Low score:** `QUALIFIED` with total < 5 gets the flag `score_below_threshold`, so it's visible on the dashboard.
+- **T6 undated events** count only if their evidence appears in the first ~2,000 characters of the news page (the "first screen").
+- **NURTURE** companies get `revisit_after = now + NURTURE_REVISIT` (60d default) and are re-queued by the daily job.
+- **Verdict explanation:** Gemini (smart) writes it **after** the code decides, citing signal and gate ids. If the call fails, the code rationale is used.
+
+## Contacts
+- **Stage unknown** (no funding stage, no headcount) uses a merged order: Security lead → CTO → Founder/CEO → VP Eng → COO.
+- C-level and founder titles are exempt from the banned-function list (e.g. "Co-founder & CEO"). Every other title containing sales, marketing, growth, HR, people, talent, recruiting, support, customer success, intern, BD, partnerships and so on is rejected. Contacts also need an email and a first name, and generic inboxes are rejected.
+- With `CONTACT_SOURCE=hunter`, uploaded CSV contacts are **also** considered (manual data wins on ties). Hunter responses are cached permanently in `hunter_cache`.
+
+## Pain points & drafting
+- If Gemini returns fewer than 2 valid pain points (each cited signal must have fired, and library pains must cite one of their own signals), code fills the gap from the library in a fixed order. The decision log marks these `source: "fallback"`.
+- The cold email uses pain #1. Follow-up #1 uses pain #2 or a different fired signal as the new angle.
+- **Quality gate, invented names check:** capitalised words in the body (excluding the greeting line and sentence starts) must appear in the company's facts or evidence, the contact, the sender or an allow-list. This is a deliberately strict heuristic. A false positive costs one rewrite, then Input needed.
+- **Allowed numbers:** numbers must appear in the facts, except `2`, `27001` (SOC 2 / ISO 27001) and `15`, `20`, `30` (CTA durations).
+- **Scheduling, confirmation, decline and clarify replies are deterministic templates**, not LLM text. They contain no claims and can't hallucinate a time or a fact. Follow-ups and "type an instruction" replies use Gemini.
+
+## Agent (LangGraph)
+- The graph is deterministic code. Gemini is used only to **classify** replies and to **draft** follow-ups and instruction replies. Tools (`lib/agent/tools.ts`) carry the 4-golden-rule descriptions and are called by nodes, not chosen by an LLM. That keeps every decision explicit and testable.
+- The `waitForReply` node uses `interrupt()`. Resume events: `reply`, `no_reply_check` (daily job), and human actions (`human_instruction`, `mark_booked`, `move_backup`, `do_not_contact`, `retry`).
+- **Thread id** is `companyId`. A company re-approached after Backup gets a fresh `"<id>-r<ts>"` thread so old state doesn't leak in.
+- **Prospect goes silent mid-negotiation** (after showing interest): no "new angle" follow-ups. The thread moves to Backup after `FOLLOWUP_1_AFTER + FOLLOWUP_2_AFTER` of silence, with outcome `positive`.
+- **"confirmed" with no matching offered slot:** if they named a time, it's checked like a proposal. Otherwise it counts as unclear (one clarification, then Input needed).
+- **Prospect-proposed times** must be free, on a weekday, inside business hours and inside the booking window. Otherwise the agent offers 2 alternatives on different days.
+- At least 2 hours' notice. Preferred slots are around 11:00, then 15:00.
+- **While a thread is in Input needed**, new replies are not auto-processed. They're picked up after a human action resumes the thread.
+- **Calendar event** attendee is only `MY_EMAIL`, with `sendUpdates: "none"`. It's tagged with the private extended property `sprintoCompanyId` for double-booking checks.
+- **Send failures** are recorded in history, and the daily job retries them (`pendingAction`).
+
+## Feedback
+- **Duplicate detection:** the model's `duplicateOfRuleId` hint, or Jaccard similarity ≥ 0.5 of content words, same kind only. On a merge, the existing rule is kept and its text is replaced if the new phrasing is longer.
+- **Cap:** above `MAX_ACTIVE_RULES`, the least-applied and then oldest rules are retired.
+- **Hook outcomes** are written at terminal states (booked, positive, negative, no_reply), keyed by the cold email's `hookSignalId`. The drafter gets the top 3 hook lines.
+
+## Dashboard / ops
+- `/api/pipeline/step` claims one company with `UPDATE … FOR UPDATE SKIP LOCKED`, so double clicks can't process the same company twice.
+- A pipeline exception puts the company in `INPUT_NEEDED` with reason `pipeline_error: …`, so the queue never stalls. **Retry** re-queues it.
+- The Run page has a per-run DRY_RUN checkbox, stored on `companies.dry_run`. `DRY_RUN=true` in env forces it on everywhere.
+- Git commits use a repo-local identity (`user.name DHIVU-PC`). Change it with `git config user.name` before pushing if you want.
