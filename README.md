@@ -4,6 +4,8 @@ An autonomous outbound agent with a hosted dashboard. It scrapes prospect sites,
 
 > **LIVE TEST MODE.** Every email the system sends goes **only to `MY_EMAIL`**. `lib/google/gmail.ts` sets the recipient itself and throws for any other address. `tests/sendSafety.test.ts` covers this.
 
+**Live:** https://sprinto-outbound-agent-bice.vercel.app · **Repo:** https://github.com/dhivyavidyadharan-web/SPRINTO (pushes to `main` auto-deploy on Vercel).
+
 ## Stack
 
 Next.js 15 (App Router, TypeScript), Tailwind · Neon Postgres + Drizzle · Gemini (`@google/genai`, structured JSON output validated by Zod) · cheerio + robots-parser, with Jina Reader as the fallback for JS-rendered pages · LangGraph.js + Postgres checkpointer · Gmail via App Password (nodemailer SMTP + imapflow IMAP) · Calendly · Vitest · Vercel Hobby.
