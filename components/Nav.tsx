@@ -15,7 +15,7 @@ const ITEMS = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function Nav({ inputNeeded }: { inputNeeded: number }) {
+export function Nav({ inputNeeded, passwordGate }: { inputNeeded: number; passwordGate: boolean }) {
   const path = usePathname();
   if (path === "/login") return null;
   return (
@@ -40,9 +40,9 @@ export function Nav({ inputNeeded }: { inputNeeded: number }) {
           );
         })}
       </nav>
-      <button className="m-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-50" onClick={async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; }}>
+      {passwordGate && <button className="m-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-50" onClick={async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; }}>
         <LogOut size={16} /> Log out
-      </button>
+      </button>}
     </aside>
   );
 }

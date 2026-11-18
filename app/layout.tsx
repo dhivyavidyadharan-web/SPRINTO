@@ -22,7 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body>
         <div className="flex min-h-screen">
-          <Nav inputNeeded={n} />
+          <Nav inputNeeded={n} passwordGate={!!process.env.DASHBOARD_PASSWORD} />
           <div className="min-w-0 flex-1">
             <MobileNav />
             <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8">{children}</main>

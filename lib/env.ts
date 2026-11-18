@@ -36,7 +36,9 @@ export const config = {
   get senderName() { return str("SENDER_NAME", "Sprinto Growth"); },
   get senderTitle() { return str("SENDER_TITLE", "Growth, Sprinto"); },
   get dashboardPassword() { return str("DASHBOARD_PASSWORD"); },
-  get encryptionKey() { return str("ENCRYPTION_KEY") || str("DASHBOARD_PASSWORD"); },
+  /** Key for encrypting the Google refresh token: ENCRYPTION_KEY, else DASHBOARD_PASSWORD, else GOOGLE_CLIENT_SECRET (always set when Google is used). */
+  get encryptionKey() { return str("ENCRYPTION_KEY") || str("DASHBOARD_PASSWORD") || str("GOOGLE_CLIENT_SECRET"); },
+  get passwordGate() { return !!str("DASHBOARD_PASSWORD"); },
   get cronSecret() { return str("CRON_SECRET"); },
   get jinaKey() { return str("JINA_API_KEY"); },
   get contactSource() { return str("CONTACT_SOURCE", "db") as "db" | "hunter"; },
@@ -80,6 +82,7 @@ export function publicConfig() {
     BACKUP_REVISIT_NO_REPLY: process.env.BACKUP_REVISIT_NO_REPLY || "60d",
     MAX_ACTIVE_RULES: config.maxActiveRules,
     DRY_RUN_ENV: config.dryRunEnv,
+    DASHBOARD_PASSWORD_GATE: config.passwordGate ? "on" : "off (dashboard is open)",
     JINA_API_KEY_SET: !!config.jinaKey,
     HUNTER_API_KEY_SET: !!config.hunterKey,
   };

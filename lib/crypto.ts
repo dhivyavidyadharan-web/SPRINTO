@@ -3,7 +3,7 @@ import { config } from "./env";
 
 function key() {
   const k = config.encryptionKey;
-  if (!k) throw new Error("ENCRYPTION_KEY or DASHBOARD_PASSWORD must be set");
+  if (!k) throw new Error("Set ENCRYPTION_KEY (or DASHBOARD_PASSWORD / GOOGLE_CLIENT_SECRET) to encrypt the Google token");
   return createHash("sha256").update(`sprinto-agent:${k}`).digest();
 }
 
