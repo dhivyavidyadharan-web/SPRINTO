@@ -80,3 +80,12 @@ describe("qualification loop", () => {
     expect(res.outcome).toBe("unreachable");
   });
 });
+
+describe("certs requirement (regression)", () => {
+  it("a non-disqualifying cert from the homepage still sends the loop to the security page", () => {
+    const f = facts({ ...b2bSaas, certificationsAchieved: ["GDPR compliant"], enterpriseOrRegulatedCustomers: ["Leroy Merlin"], headcountEstimate: 40 });
+    const visited = new Set<PageType>(["homepage", "careers"]);
+    expect(sufficiencyCheck(f, visited, all)).toContain("certs");
+    expect(chooseNextPage(sufficiencyCheck(f, visited, all), visited, all)?.page).toBe("security");
+  });
+});

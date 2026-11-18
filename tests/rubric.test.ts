@@ -59,6 +59,12 @@ describe("rubric verdicts", () => {
     const v = computeVerdict(facts({ ...b2bSaas, fundingStage: "Series A", complianceSecurityRoles: ["GRC Lead"], hasEnterprisePlan: true }), ctx(["homepage", "careers"]));
     expect(v.flags).toContain(FLAGS.CERT_UNVERIFIED);
   });
+  it("GDPR-only cert list from homepage does not verify 'not certified' (regression: idukki.io)", () => {
+    const f = facts({ ...b2bSaas, certificationsAchieved: ["GDPR compliant"], enterpriseOrRegulatedCustomers: ["Leroy Merlin"], headcountEstimate: 40 });
+    const v = computeVerdict(f, ctx(["homepage", "careers"]));
+    expect(v.gates.G3.status).toBe("unknown");
+    expect(v.flags).toContain(FLAGS.CERT_UNVERIFIED);
+  });
   it("one weak timing signal → QUALIFIED with low-score flag", () => {
     const v = computeVerdict(facts({ ...b2bSaas, fundingStage: "Seed", mentionsGdprOrDpa: true }), ctx());
     expect(v.verdict).toBe("QUALIFIED");

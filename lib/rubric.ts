@@ -30,6 +30,8 @@ export const SCRAPE = {
   MIN_BLOCK_WORDS: 8,
   CACHE_DAYS: 7,
   NEWS_FIRST_SCREEN_CHARS: 2000,
+  /** Stop fetching extra pages after this long so a request stays well under Vercel's 60 s. */
+  LOOP_TIME_BUDGET_MS: 35_000,
   BADGE_RE: /soc ?2|iso ?27001|gdpr|hipaa|trust|security|vanta|drata|secureframe|sprinto/i,
   NOISE_RE: /nav|menu|footer|cookie|consent|banner|modal|popup|newsletter/i,
 };
@@ -108,7 +110,9 @@ export function evaluateGates(f: Facts, ctx: RubricContext): Record<GateId, Gate
     : { status: f.buyerType.value === "consumer" ? "fail" : "pass", evidence: f.buyerType.evidence, sourceUrl: f.buyerType.sourceUrl, note: `buyerType=${f.buyerType.value}` };
 
   const cert = hasDisqualifyingCert(f.certificationsAchieved.value);
-  const certsChecked = ctx.visited.has("security") || (f.certificationsAchieved.value?.length ?? 0) > 0 || (f.certificationsInProgress.value?.length ?? 0) > 0;
+  // Only the security/trust page (or an explicit in-progress audit) verifies "not certified".
+  // A non-empty list like ["GDPR compliant"] from the homepage does NOT prove there is no SOC 2.
+  const certsChecked = ctx.visited.has("security") || (f.certificationsInProgress.value?.length ?? 0) > 0;
   // Prefer the quote that actually names the disqualifying certificate.
   const certQuotes = [
     { evidence: f.certificationsAchieved.evidence, sourceUrl: f.certificationsAchieved.sourceUrl },
@@ -258,7 +262,7 @@ export function sufficiencyCheck(f: Facts, visited: Set<PageType>, available: Se
   if (f.isSoftwareProduct.value === null && !exhausted("product")) missing.push("product");
   if (f.buyerType.value === null && !exhausted("buyer")) missing.push("buyer");
 
-  const certsKnown = visited.has("security") || (f.certificationsAchieved.value?.length ?? 0) > 0 || !!f.complianceToolDetected.value;
+  const certsKnown = visited.has("security") || !!hasDisqualifyingCert(f.certificationsAchieved.value) || !!f.complianceToolDetected.value;
   if (!certsKnown && !exhausted("certs")) missing.push("certs");
 
   const signals = evaluateSignals(f, { now, visited });

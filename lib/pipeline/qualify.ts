@@ -27,6 +27,8 @@ export interface LoopDeps {
   extract: (url: string, pageType: PageType, cleaned: Cleaned) => Promise<Extraction>;
   maxExtraFetches: number;
   now?: Date;
+  /** Epoch ms after which no more pages are fetched (decide with what is known). */
+  deadline?: number;
 }
 
 export interface LoopResult {
@@ -95,6 +97,7 @@ export async function runQualificationLoop(domain: string, deps: LoopDeps): Prom
     if (anyGateFailed(facts, visited)) { stopReason = "short-circuit: a hard gate already failed"; break; }
     const missing = sufficiencyCheck(facts, visited, available, now);
     if (missing.length === 0) { stopReason = "all requirements satisfied"; break; }
+    if (deps.deadline && Date.now() > deps.deadline) { stopReason = "time budget reached; deciding with what is known"; break; }
     if (extra >= deps.maxExtraFetches) { stopReason = `fetch cap reached (${deps.maxExtraFetches} extra pages); deciding with what is known`; break; }
     const next = chooseNextPage(missing, visited, available);
     if (!next) { stopReason = `no remaining page can fill: ${missing.join(", ")}`; break; }

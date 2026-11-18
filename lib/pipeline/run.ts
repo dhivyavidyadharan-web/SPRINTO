@@ -83,6 +83,7 @@ async function processCompany(c: Company, log: DecisionLog, meter: TokenMeter): 
     const scraper = new Scraper(config.maxHttpRequests);
     const loop = await runQualificationLoop(c.domain, {
       maxExtraFetches: config.maxExtraFetches,
+      deadline: Date.now() + SCRAPE.LOOP_TIME_BUDGET_MS,
       fetchPage: (url, pageType) => cachedFetch(scraper, c.id, url, pageType),
       extract: (url, pageType, cleaned) => extractFacts({ url, pageType, cleaned, domain: c.domain, meter }),
     });
