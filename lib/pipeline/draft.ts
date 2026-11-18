@@ -39,6 +39,38 @@ const ColdSchema = z.object({
   rulesApplied: z.array(z.string()),
 });
 
+/**
+ * Deterministic plain-text layout: greeting on its own line, one blank line between paragraphs,
+ * signature (name + title) on its own lines at the end. Fixes drafts returned as one run-on line.
+ */
+export function formatEmailBody(raw: string, senderName: string, senderTitle: string): string {
+  let b = raw.replace(/\r\n/g, "\n").trim();
+  // Strip any signature the model wrote (we re-add it), wherever it ended up.
+  for (const s of [senderTitle, senderName]) {
+    const re = new RegExp(`[\\s,]*${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`);
+    b = b.replace(re, "").trim();
+  }
+  b = b.replace(/[\s,]*(Best|Thanks|Cheers|Regards|Best regards|Kind regards)[,.]?\s*$/i, "").trim();
+  // Greeting on its own line.
+  const g = /^(Hi [^,\n]+,)\s*/.exec(b);
+  let greeting = "";
+  if (g) { greeting = g[1]; b = b.slice(g[0].length).trim(); }
+  // If the body has no paragraph breaks, put each sentence group on its own paragraph:
+  // hook / pain (until "Sprinto") / value / CTA.
+  if (!/\n/.test(b)) {
+    const sentences = b.match(/[^.!?]+[.!?]+(\s|$)/g)?.map((x) => x.trim()) ?? [b];
+    const paras: string[] = [];
+    for (const s of sentences) {
+      const startNew = paras.length === 0 || /^Sprinto\b/.test(s) || /\?$/.test(s) || /^(Sprinto|Would|Open|Are|Could|Can|Worth|Happy)\b/.test(s);
+      if (startNew) paras.push(s); else paras[paras.length - 1] += ` ${s}`;
+    }
+    b = paras.join("\n\n");
+  } else {
+    b = b.replace(/\n{3,}/g, "\n\n");
+  }
+  return `${greeting ? `${greeting}\n\n` : ""}${b}\n\n${senderName}\n${senderTitle}`;
+}
+
 export function signature() {
   return `${config.senderName}\n${config.senderTitle}`;
 }
@@ -157,7 +189,7 @@ async function draftWithGate(ctx: DraftContext, system: string, prompt: string, 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const p: string = attempt === 1 ? prompt : `${prompt}\n\nYOUR PREVIOUS DRAFT FAILED THE QUALITY GATE:\n${failures[failures.length - 1].map((f) => `- ${f}`).join("\n")}\n\nPrevious draft:\nSubject: ${lastDraft?.subject}\n${lastDraft?.body}\n\nRewrite it fixing every failure.`;
     const d: z.infer<typeof ColdSchema> = await generateJson({ slot: "smart", purpose: `${purpose}#${attempt}`, system, prompt: p, schema: ColdSchema, temperature: 0.7, meter: ctx.meter });
-    d.body = d.body.replace(/\r\n/g, "\n").trim();
+    d.body = formatEmailBody(d.body, config.senderName, config.senderTitle);
     lastDraft = d;
     gate = qualityGate({
       subject: d.subject, body: d.body, firstName: ctx.contact.firstName, hookSignalId: d.hookSignalId, hookQuote: d.hookQuote,

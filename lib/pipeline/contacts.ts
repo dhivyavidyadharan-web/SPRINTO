@@ -27,7 +27,7 @@ export const hunterProvider: ContactProvider = {
     if (cached.length) data = cached[0].response;
     else {
       if (!config.hunterKey) return [];
-      const res = await fetch(`https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=20&api_key=${config.hunterKey}`, { signal: AbortSignal.timeout(15000) });
+      const res = await fetch(`https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=10&api_key=${config.hunterKey}`, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) throw new Error(`Hunter HTTP ${res.status}`);
       data = await res.json();
       await db().insert(schema.hunterCache).values({ domain, response: data as object }).onConflictDoNothing();
