@@ -1,0 +1,7 @@
+.env*
+!.env.example
+scratch
+.next
+node_modules
+.claude
+*.tsbuildinfo
