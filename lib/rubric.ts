@@ -68,6 +68,21 @@ export const SIGNALS: Record<SignalId, { name: string; points: number; firesWhen
   F2: { name: "Employee size", points: 1, firesWhen: "20 <= headcountEstimate <= 500 OR openRolesCount >= 5", layer: "fit" },
 };
 
+/**
+ * Approved self-learning changes to signal points (from the Self-learning page). Defaults above stay the
+ * source of truth; an override only exists after a human approved it. Bounded to 0..MAX_SIGNAL_POINTS.
+ */
+export const MAX_SIGNAL_POINTS = 4;
+let pointOverrides: Partial<Record<SignalId, number>> = {};
+export function setPointOverrides(o: Partial<Record<SignalId, number>>) {
+  pointOverrides = Object.fromEntries(Object.entries(o).filter(([k, v]) => (SIGNAL_IDS as readonly string[]).includes(k) && Number.isFinite(v)).map(([k, v]) => [k, Math.max(0, Math.min(MAX_SIGNAL_POINTS, Math.round(v as number)))]));
+}
+export function getPointOverrides() { return { ...pointOverrides }; }
+/** Effective points for a signal (override if approved, else the default). */
+export function signalPoints(id: SignalId): number {
+  return pointOverrides[id] ?? SIGNALS[id].points;
+}
+
 export const T6_EVENT_TYPES: RecentEvent["type"][] = ["funding", "enterprise_launch", "expansion", "enterprise_customer"];
 export const T6_MAX_AGE_DAYS = 365;
 export const F1_STAGES = ["Series A", "Series B", "Series C"];
@@ -166,7 +181,7 @@ export function qualifyingEvent(f: Facts, ctx: RubricContext): RecentEvent | nul
 
 export function evaluateSignals(f: Facts, ctx: RubricContext): Record<SignalId, SignalResult> {
   const mk = (id: SignalId, fired: boolean, evidence: string | null, sourceUrl: string | null, note?: string): SignalResult =>
-    ({ fired, points: fired ? SIGNALS[id].points : 0, evidence: fired ? evidence : null, sourceUrl: fired ? sourceUrl : null, note });
+    ({ fired, points: fired ? signalPoints(id) : 0, evidence: fired ? evidence : null, sourceUrl: fired ? sourceUrl : null, note });
 
   const roles = f.complianceSecurityRoles.value ?? [];
   const inProg = f.certificationsInProgress.value ?? [];
@@ -211,7 +226,7 @@ export interface VerdictResult {
  */
 export function decideVerdict(gates: Record<GateId, GateStatus>, firedSignals: SignalId[]): Omit<VerdictResult, "gates" | "signals"> {
   const fired = SIGNAL_IDS.filter((s) => firedSignals.includes(s));
-  const score = fired.reduce((n, s) => n + SIGNALS[s].points, 0);
+  const score = fired.reduce((n, s) => n + signalPoints(s), 0);
   const base = { firedSignals: fired, score };
   const failed = GATE_IDS.filter((g) => gates[g] === "fail");
   if (failed.length) return { ...base, verdict: "DISQUALIFIED", flags: [], inputNeededReason: null, rationale: `Gate(s) failed: ${failed.join(", ")}` };

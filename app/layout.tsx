@@ -18,11 +18,12 @@ async function counts() {
         (SELECT count(*)::int FROM companies WHERE status = 'INPUT_NEEDED') AS input_needed,
         (SELECT count(*)::int FROM companies WHERE status IN ('BACKUP','FOLLOWUP_1_SENT','FOLLOWUP_2_SENT','NURTURE')) AS cold,
         (SELECT count(*)::int FROM emails e WHERE e.kind IN ('cold','followup_1','followup_2') AND e.send_status IN ('sent','dry_run')
-           AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.email_id = e.id)) AS feedback`);
-    const row = r.rows[0] as { input_needed: number; cold: number; feedback: number };
-    return { inputNeeded: row.input_needed, cold: row.cold, feedback: row.feedback };
+           AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.email_id = e.id)) AS feedback,
+        (SELECT count(*)::int FROM learning_suggestions WHERE status = 'pending') AS learning`);
+    const row = r.rows[0] as { input_needed: number; cold: number; feedback: number; learning: number };
+    return { inputNeeded: row.input_needed, cold: row.cold, feedback: row.feedback, learning: row.learning };
   } catch {
-    return { inputNeeded: 0, cold: 0, feedback: 0 };
+    return { inputNeeded: 0, cold: 0, feedback: 0, learning: 0 };
   }
 }
 

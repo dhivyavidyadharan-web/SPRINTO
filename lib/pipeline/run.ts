@@ -18,6 +18,7 @@ import { emptyLog, type DecisionLog } from "./decisionLog";
 import { sendEmail } from "../mail";
 import { getActiveRules, hookSummary, markRulesApplied } from "../feedback";
 import { startConversation } from "../agent/runtime";
+import { draftingPlan, loadRubricOverrides } from "../learning";
 
 export interface StepResult { done: boolean; companyId?: number; domain?: string; status?: string; detail?: string; tokens?: number; costUsd?: number }
 
@@ -41,6 +42,7 @@ async function setStatus(id: number, status: Company["status"], extra: Partial<t
 export async function pipelineStep(): Promise<StepResult> {
   const c = await claimNext();
   if (!c) return { done: true };
+  await loadRubricOverrides(); // approved self-learning point changes
   const meter = new TokenMeter();
   const log: DecisionLog = (c.resumeFrom && c.decisionLog) ? (c.decisionLog as DecisionLog) : emptyLog(c.domain);
   if (!c.resumeFrom) log.runAt = new Date().toISOString();
@@ -169,15 +171,22 @@ async function processCompany(c: Company, log: DecisionLog, meter: TokenMeter): 
   // ── Step 6: draft + quality gate
   const companyName = facts.companyName.value ?? c.name ?? c.domain;
   const rules = await getActiveRules();
+  // Self-learning: ~half of emails also get each trial rule; every email gets one arm of the running A/B experiment.
+  const plan = await draftingPlan(c.id);
   const draft = await draftColdEmail({
     domain: c.domain, companyName, facts, verdict, meter,
     contact: { firstName: chosen.firstName!, lastName: chosen.lastName, title: chosen.title ?? "" },
-    painPoints: pp.painPoints, rules: rules.map((r) => ({ id: r.id, kind: r.kind, text: r.text })), hookSummary: await hookSummary(),
+    painPoints: pp.painPoints, rules: [...rules, ...plan.trialRules].map((r) => ({ id: r.id, kind: r.kind, text: r.text })), hookSummary: await hookSummary(),
+    experimentInstruction: plan.experiment?.instruction,
   });
-  log.email = { subject: draft.subject, body: draft.body, hookSignalId: draft.hookSignalId, hookQuote: draft.hookQuote, rulesApplied: draft.rulesApplied, painPointIdsUsed: draft.painPointIdsUsed, qualityGate: draft.qualityGate };
+  const trialRuleIds = plan.trialRules.map((r) => `R${r.id}`);
+  const variant = plan.experiment ? { experimentId: plan.experiment.experimentId, arm: plan.experiment.arm } : null;
+  log.email = { subject: draft.subject, body: draft.body, hookSignalId: draft.hookSignalId, hookQuote: draft.hookQuote, rulesApplied: draft.rulesApplied, painPointIdsUsed: draft.painPointIdsUsed, qualityGate: draft.qualityGate,
+    learning: { trialRuleIds, experiment: plan.experiment ? { ...variant!, dimension: plan.experiment.dimension, instruction: plan.experiment.instruction } : null } };
   const [emailRow] = await db().insert(schema.emails).values({
     companyId: c.id, kind: "cold", subject: draft.subject, body: draft.body, hookSignalId: draft.hookSignalId, hookQuote: draft.hookQuote,
     painPointIds: pp.painPoints.map((p) => p.id), rulesApplied: draft.rulesApplied, qualityGate: draft.qualityGate, sendStatus: "draft",
+    trialRuleIds, variant,
   }).returning();
   await markRulesApplied(draft.rulesApplied);
 

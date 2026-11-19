@@ -102,3 +102,26 @@ These are the choices made where the brief left room. Each one is easy to change
   - This is acceptable for a live-test prototype, but a production deployment should use a licensed news API (e.g. a paid news-search API). `NEWS_SOURCE=google|bing|off` switches the source, and Bing is the automatic fallback.
 - **Rubric page** is rewritten in plain English: a 5-step flow, why each gate and signal matters, live counts (gates knocked out, signals seen) and a **"try it" simulator**. The simulator calls the same pure `decideVerdict()` the pipeline uses (`computeVerdict` now delegates to it), so the two can't drift apart.
 - **Company search bar** (top of every page, press `/`): finds existing companies by name or domain. Typing a website that isn't in the system offers **"Research <domain> now"**, which queues it and runs the steps inline, then opens its decision log.
+
+## Self-learning loop: A outcome rules, B A/B tests, C self-review (2026-11-19)
+- **Unit of learning:** one sent cold email.
+  - Success means a positive reply or a booked meeting (`hook_outcomes`).
+  - No outcome after 21 days counts as no reply. Emails still inside that window are "pending" and not used.
+  - Pure statistics are in `lib/learning/stats.ts` (unit-tested); DB and LLM code is in `lib/learning/index.ts`. A separate daily cron (`/api/cron/learning`, 04:00 UTC) keeps the reply job fast. There is also a "Run learning now" button.
+- **A. Outcome rules:**
+  - **Finding patterns:** reply rates are compared by opening hook, pain point and length, overall and within each role and company stage.
+  - **Trial:** a pattern needs ≥8 emails in its group, ≥5 in the rest, a one-sided z ≥ 1.64 and a lift ≥ 1.5×. It then becomes a **trial rule**, shown to about 50% of new cold emails (deterministic per company). At most 3 trials run at once, and one new trial starts per run.
+  - **Decision:** once each arm has ≥6 outcomes, the rule is kept (goes live) only if emails with it did at least as well; otherwise it's dropped.
+  - **Rollback:** a live auto rule is rolled back if results since it went live are clearly worse (z ≤ −1.64).
+  - **No repeats:** a pattern already tried is never retried, and duplicates of human rules are skipped.
+- **B. A/B tests:**
+  - One experiment at a time, in order: CTA → subject → length → opener. Each cold email gets arm A or B (deterministic 50/50) as a "style experiment" instruction. Hard rules and the quality gate still win.
+  - A winner needs ≥15 outcomes per arm and |z| ≥ 1.64, and then becomes a live rule (origin `experiment`).
+  - "No winner" is declared after 40 outcomes per arm. The arm is stored on `emails.variant`.
+- **C. Self-review:**
+  - **Rubric points:** compares emailed leads with and without each signal and proposes ±1 point, bounded 0..4.
+  - **Verdicts:** 7+ days after a Disqualified or Nurture verdict, up to 3 companies per run get an LLM second opinion on whether the *evidence* supports it. Weak cert sources, early stops and misread headcount are flagged for re-research.
+  - **Approval:** both kinds are **suggestions that need a human yes**. Approved point changes are stored in `settings.rubric_overrides` and applied through `signalPoints()`; the coded defaults stay the source of truth, and there's a one-click reset. Approving a re-research re-queues the company.
+- **Live state at launch:** only 2 emails have outcomes (Rize booked, Idukki declined). That's not enough for A or C yet, and the page shows progress toward each threshold. Experiment #1 (CTA style) started, so every new cold email now feeds it. Live checks:
+  - verdict review on linear.app → "keep" (ISO 27001 on its security page);
+  - the arm-B (soft CTA) draft for Rize passed the quality gate.

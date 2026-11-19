@@ -71,6 +71,10 @@ export const emails = pgTable("emails", {
   hookQuote: text("hook_quote"),
   painPointIds: text("pain_point_ids").array().notNull().default([]),
   rulesApplied: text("rules_applied").array().notNull().default([]),
+  /** Self-learning: trial rules shown to the drafter for this email (treatment group). */
+  trialRuleIds: text("trial_rule_ids").array().notNull().default([]),
+  /** Self-learning: A/B experiment arm, e.g. { experimentId: 3, arm: "B" }. */
+  variant: jsonb("variant"),
   qualityGate: jsonb("quality_gate"),
   sendStatus: text("send_status").notNull().default("draft"), // draft|sent|dry_run|send_failed|blocked
   gmailMessageId: text("gmail_message_id"),
@@ -118,7 +122,12 @@ export const rules = pgTable("rules", {
   text: text("text").notNull(),
   sourceFeedbackId: integer("source_feedback_id").references(() => feedback.id, { onDelete: "set null" }),
   timesApplied: integer("times_applied").notNull().default(0),
-  status: text("status").notNull().default("active"), // active|retired
+  status: text("status").notNull().default("active"), // active|trial|retired
+  /** human (from feedback) | outcome (learned from replies) | experiment (A/B winner) */
+  origin: text("origin").notNull().default("human"),
+  /** Stats behind an auto rule, and its trial result. */
+  evidence: jsonb("evidence"),
+  statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -130,6 +139,35 @@ export const hookOutcomes = pgTable("hook_outcomes", {
   painPointIds: text("pain_point_ids").array().notNull().default([]),
   outcome: text("outcome").notNull(), // booked|positive|negative|no_reply
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** B: one A/B experiment on a writing dimension. One runs at a time. */
+export const experiments = pgTable("experiments", {
+  id: serial("id").primaryKey(),
+  dimension: text("dimension").notNull(),
+  armA: text("arm_a").notNull(),
+  armB: text("arm_b").notNull(),
+  status: text("status").notNull().default("running"), // running|concluded
+  winner: text("winner"), // A|B|none
+  result: jsonb("result"),
+  winnerRuleId: integer("winner_rule_id"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  concludedAt: timestamp("concluded_at", { withTimezone: true }),
+});
+
+/** C: changes the agent proposes to its own rubric / verdicts, waiting for a human yes or no. */
+export const learningSuggestions = pgTable("learning_suggestions", {
+  id: serial("id").primaryKey(),
+  kind: text("kind").notNull(), // signal_points | verdict_review
+  target: text("target").notNull(), // e.g. "T5" or a domain
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  current: jsonb("current"),
+  proposed: jsonb("proposed"),
+  rationale: text("rationale").notNull(),
+  evidence: jsonb("evidence"),
+  status: text("status").notNull().default("pending"), // pending|approved|rejected|confirmed
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
 });
 
 export const events = pgTable("events", {
@@ -163,3 +201,5 @@ export type Contact = typeof contacts.$inferSelect;
 export type Email = typeof emails.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
 export type Rule = typeof rules.$inferSelect;
+export type Experiment = typeof experiments.$inferSelect;
+export type LearningSuggestion = typeof learningSuggestions.$inferSelect;

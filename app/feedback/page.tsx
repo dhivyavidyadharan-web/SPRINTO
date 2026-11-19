@@ -68,11 +68,12 @@ export default async function FeedbackPage() {
             ) : (
               <ul className="space-y-2">
                 {rules.map((r, i) => (
-                  <li key={r.id} className={`reveal rounded-xl p-2.5 text-sm ring-1 ${r.status === "active" ? "bg-white ring-brand-100" : "bg-cream-50 opacity-60 ring-cream-200"}`} style={{ animationDelay: `${240 + i * 40}ms` }}>
+                  <li key={r.id} className={`reveal rounded-xl p-2.5 text-sm ring-1 ${r.status !== "retired" ? "bg-white ring-brand-100" : "bg-cream-50 opacity-60 ring-cream-200"}`} style={{ animationDelay: `${240 + i * 40}ms` }}>
                     <div className="mb-1 flex items-center gap-2">
                       <span className="mono text-ink-500">R{r.id}</span>
                       <Pill tone={r.kind === "do" ? "green" : "red"}>{r.kind === "do" ? "DO" : "DON'T"}</Pill>
-                      <span className="ml-auto text-[11px] text-ink-500">applied {r.timesApplied}× · {r.sourceFeedbackId ? `from feedback #${r.sourceFeedbackId}` : "manual"}</span>
+                      {r.status === "trial" && <Pill tone="amber">on trial</Pill>}
+                      <span className="ml-auto text-[11px] text-ink-500">applied {r.timesApplied}× · {r.origin === "outcome" ? <Link href="/learning" className="font-semibold text-blush-600">learned from replies</Link> : r.origin === "experiment" ? <Link href="/learning" className="font-semibold text-blush-600">A/B test winner</Link> : r.sourceFeedbackId ? `from feedback #${r.sourceFeedbackId}` : "manual"}</span>
                     </div>
                     <RuleRow id={r.id} kind={r.kind} text={r.text} status={r.status} />
                   </li>

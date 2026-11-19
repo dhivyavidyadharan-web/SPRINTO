@@ -2,9 +2,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { LayoutDashboard, Play, KanbanSquare, MessagesSquare, AlertTriangle, Snowflake, Sparkles, Scale, Settings, LogOut, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Play, KanbanSquare, MessagesSquare, AlertTriangle, Snowflake, Sparkles, Scale, Settings, LogOut, ShieldCheck, BrainCircuit } from "lucide-react";
 
-type Counts = { inputNeeded: number; cold: number; feedback: number };
+type Counts = { inputNeeded: number; cold: number; feedback: number; learning: number };
 
 const ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
@@ -14,6 +14,7 @@ const ITEMS = [
   { href: "/cold", label: "Cold deals", icon: Snowflake, count: "cold" as const },
   { href: "/input-needed", label: "Input needed", icon: AlertTriangle, count: "inputNeeded" as const },
   { href: "/feedback", label: "Feedback loop", icon: Sparkles, count: "feedback" as const },
+  { href: "/learning", label: "Self-learning", icon: BrainCircuit, count: "learning" as const },
   { href: "/rubric", label: "Qualification rubric", icon: Scale },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -22,6 +23,7 @@ const BADGE: Record<keyof Counts, string> = {
   inputNeeded: "bg-amber-400 text-brand-900",
   cold: "bg-sky-300/90 text-brand-900",
   feedback: "bg-blush-400 text-white",
+  learning: "bg-zest-300 text-brand-900",
 };
 
 export function Nav({ counts, passwordGate }: { counts: Counts; passwordGate: boolean }) {

@@ -33,6 +33,8 @@ export interface DecisionLog {
     subject: string; body: string; hookSignalId: string | null; hookQuote: string | null; rulesApplied: string[];
     painPointIdsUsed?: string[];
     qualityGate: { passed: boolean; attempts: number; failures: string[][] };
+    /** Self-learning: trial rules shown to the drafter and the A/B arm this email got. */
+    learning?: { trialRuleIds: string[]; experiment: { experimentId: number; arm: "A" | "B"; dimension: string; instruction: string } | null };
   };
   send?: { status: string; messageId: string | null; threadId: string | null; dryRun: boolean; error?: string };
   tokens: { in: number; out: number };

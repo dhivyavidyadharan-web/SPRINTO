@@ -18,6 +18,8 @@ export interface DraftContext {
   painPoints: PainPoint[];
   rules: ActiveRule[];
   hookSummary: string;
+  /** Self-learning A/B arm instruction for this email (cold emails only). */
+  experimentInstruction?: string;
   meter?: TokenMeter;
 }
 
@@ -114,7 +116,10 @@ FEEDBACK RULES (from the Growth Lead — follow them):
 ${rulesBlock(ctx.rules)}
 
 HOOK PERFORMANCE SO FAR:
-${ctx.hookSummary}`;
+${ctx.hookSummary}${ctx.experimentInstruction ? `
+
+STYLE EXPERIMENT (follow this exactly; it takes priority over any style rule above, but never over the HARD RULES):
+${ctx.experimentInstruction}` : ""}`;
   return draftWithGate(ctx, COLD_SYSTEM, prompt, EMAIL_LIMITS.COLD_MAX_WORDS, true, "draft_cold");
 }
 

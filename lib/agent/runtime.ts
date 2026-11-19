@@ -18,6 +18,7 @@ import type { DecisionLog } from "../pipeline/decisionLog";
 import { computeVerdict, type PageType } from "../rubric";
 import type { Facts } from "../facts";
 import { getActiveRules, hookSummary, markRulesApplied, recordHookOutcome } from "../feedback";
+import { loadRubricOverrides } from "../learning";
 import { EMAIL_LIMITS, BANNED_PHRASES, SPRINTO_FACTS } from "../rubric";
 
 // ───────────── Checkpointer ─────────────
@@ -44,6 +45,7 @@ const ClassifySchema = z.object({
 });
 
 async function companyContext(companyId: number) {
+  await loadRubricOverrides();
   const [c] = await db().select().from(schema.companies).where(eq(schema.companies.id, companyId));
   return c;
 }
