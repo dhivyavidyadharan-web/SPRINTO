@@ -2,15 +2,7 @@
 
 An autonomous outbound agent with a hosted dashboard. It scrapes prospect sites, extracts evidence-backed facts, qualifies companies against Sprinto's rubric, picks the decision-maker and two pain points, then drafts and sends a personalised cold email. A LangGraph agent handles the reply conversation (scheduling, follow-ups, declines, unsubscribes), and the drafter learns from your feedback.
 
-> **LIVE TEST MODE.** Every email the system sends goes **only to `MY_EMAIL`**. `lib/mail/index.ts` sets the recipient itself and throws for any other address. `tests/sendSafety.test.ts` covers this.
-
-**Live dashboard:** https://sprinto-outbound-agent-bice.vercel.app
-
-## Components map
-
-![Components map](docs/components-map.png)
-
-Editable source: [`docs/components-map.svg`](docs/components-map.svg)
+> **LIVE TEST MODE.** Every email the system sends goes **only to `MY_EMAIL`**. `lib/google/gmail.ts` sets the recipient itself and throws for any other address. `tests/sendSafety.test.ts` covers this.
 
 **Live:** https://sprinto-outbound-agent-bice.vercel.app · **Repo:** https://github.com/dhivyavidyadharan-web/SPRINTO (pushes to `main` auto-deploy on Vercel).
 
