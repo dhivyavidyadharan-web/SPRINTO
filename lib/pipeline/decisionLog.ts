@@ -1,5 +1,5 @@
 import type { GateId, GateResult, SignalId, SignalResult } from "../rubric";
-import type { FetchTrailEntry } from "./qualify";
+import type { FetchTrailEntry, NewsSummary } from "./qualify";
 import type { PainPoint } from "./painPoints";
 
 export interface DecisionLog {
@@ -17,6 +17,8 @@ export interface DecisionLog {
   /** First screen of the news page (for undated T6 events when Steps 4–7 resume in a later request). */
   newsFirstScreen?: string;
   fetchTrail: FetchTrailEntry[];
+  /** Headlines from the news-feed check, and which ones were used as evidence. */
+  news?: NewsSummary;
   httpRequests: number;
   contact?: {
     chosen: { name: string; title: string | null; email: string | null; linkedinUrl?: string | null; source: string } | null;

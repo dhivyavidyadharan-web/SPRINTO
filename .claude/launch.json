@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "dashboard", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 }
+    { "name": "dashboard", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 },
+    { "name": "parva-dev", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "C:/Users/DHIVU-PC/Desktop/parva survey", "run", "dev", "--", "-p", "3100"], "port": 3100 }
   ]
 }

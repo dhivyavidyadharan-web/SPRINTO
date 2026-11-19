@@ -4,6 +4,7 @@ import { Instrument_Sans } from "next/font/google";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { Nav, MobileNav } from "@/components/Nav";
+import { CompanySearch } from "@/components/CompanySearch";
 
 const instrument = Instrument_Sans({ subsets: ["latin"], variable: "--font-instrument", display: "swap" });
 
@@ -38,6 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Nav counts={c} passwordGate={!!process.env.DASHBOARD_PASSWORD} />
           <div className="min-w-0 flex-1">
             <MobileNav counts={c} />
+            <CompanySearch />
             <main className="mx-auto max-w-[1400px] px-4 py-7 md:px-8">{children}</main>
           </div>
         </div>

@@ -119,7 +119,7 @@ confidence: 0..1. Return JSON only.`,
       const c = await companyContext(s.companyId);
       const log = c.decisionLog as DecisionLog;
       const facts = c.facts as Facts;
-      const visited = new Set<PageType>(log.fetchTrail.map((t) => t.pageType));
+      const visited = new Set<PageType>(log.fetchTrail.map((t) => t.pageType).filter((p): p is PageType => p !== "news_feed"));
       const verdict = computeVerdict(facts, { now: new Date(), visited, newsFirstScreen: log.newsFirstScreen });
       const [cold] = await db().select().from(schema.emails).where(and(eq(schema.emails.companyId, s.companyId), eq(schema.emails.kind, "cold"))).orderBy(desc(schema.emails.id)).limit(1);
       const rules = await getActiveRules();

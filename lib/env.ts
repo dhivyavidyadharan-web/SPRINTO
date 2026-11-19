@@ -46,6 +46,8 @@ export const config = {
   get jinaKey() { return str("JINA_API_KEY"); },
   get contactSource() { return str("CONTACT_SOURCE", "db") as "db" | "hunter"; },
   get hunterKey() { return str("HUNTER_API_KEY"); },
+  /** News research feed: google (default) | bing | off. */
+  get newsSource() { const v = str("NEWS_SOURCE", "google").toLowerCase(); return (["google", "bing", "off"].includes(v) ? v : "google") as "google" | "bing" | "off"; },
   get timezone() { return str("TIMEZONE", "Asia/Kolkata"); },
   get businessStart() { return str("BUSINESS_HOURS_START", "10:00"); },
   get businessEnd() { return str("BUSINESS_HOURS_END", "18:00"); },
@@ -72,6 +74,7 @@ export function publicConfig() {
     SENDER_NAME: config.senderName,
     SENDER_TITLE: config.senderTitle,
     CONTACT_SOURCE: config.contactSource,
+    NEWS_SOURCE: config.newsSource,
     TIMEZONE: config.timezone,
     BUSINESS_HOURS: `${config.businessStart}–${config.businessEnd}`,
     MEETING_MINUTES: config.meetingMinutes,

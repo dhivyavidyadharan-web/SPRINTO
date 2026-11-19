@@ -1,5 +1,6 @@
 import { generateJson, type TokenMeter } from "../llm/gemini";
-import { ExtractionSchema, groundExtraction, type Extraction } from "../facts";
+import { ExtractionSchema, groundExtraction, quoteIn, SCALAR_KEYS, LIST_KEYS, type Extraction } from "../facts";
+import { newsAsCleaned, itemForQuote, type NewsItem } from "../scrape/news";
 import type { Cleaned } from "../scrape/clean";
 
 const SYSTEM = `You extract structured facts about a company from ONE web page, for a B2B compliance-software sales team.
@@ -49,4 +50,51 @@ ${cleaned.badgeHints.join(" | ") || "(none)"}`;
 
 export function pageTextForGrounding(c: Cleaned) {
   return `${c.title}\n${c.mainText}\n${c.footerText}\n${c.badgeHints.join("\n")}`;
+}
+
+const NEWS_ADDENDUM = `
+This "page" is a list of NEWS HEADLINES from a news search, one per line: [n] date · publisher · headline.
+Extra rules for news:
+- Several companies can share a name. Use a headline ONLY if it is clearly about the company described below (same product / industry). If unsure, ignore it.
+- Evidence must be copied from the HEADLINE text only (not the date or publisher).
+- certificationsAchieved: only if a headline says the company achieved/completed/earned a certification or attestation (e.g. "Acme achieves SOC 2 Type II").
+- certificationsInProgress: only if a headline says it is pursuing / starting an audit.
+- recentEvents: funding rounds, enterprise launches, expansions, big enterprise customer wins, security incidents. Use the line's date as the ISO date.
+- fundingStage: only if a headline names the round (e.g. "raises $20M Series B").
+- Leave every other field null unless a headline states it.`;
+
+/** Extract facts from news headlines; every fact links to the article it came from. */
+export async function extractNewsFacts(args: { items: NewsItem[]; name: string; domain: string; companyContext: string; feedUrl: string; meter?: TokenMeter }): Promise<{ extraction: Extraction; usedLinks: string[] }> {
+  const cleaned = newsAsCleaned(args.items, args.name);
+  const prompt = `Company domain: ${args.domain}
+Company name: ${args.name}
+What the company does (from its homepage): ${args.companyContext.slice(0, 600) || "(unknown)"}
+Page URL: ${args.feedUrl}
+
+=== NEWS HEADLINES ===
+${cleaned.mainText}`;
+  const raw = await generateJson({
+    slot: "fast", purpose: "extract:news_feed", system: SYSTEM + NEWS_ADDENDUM, prompt, schema: ExtractionSchema, temperature: 0, meter: args.meter,
+  });
+  // Ground against the headlines only, then point each fact at its article.
+  const headlines = args.items.map((i) => i.title).join("\n");
+  const x = groundExtraction(raw, headlines, args.feedUrl);
+  const used = new Set<string>();
+  const rec = x as unknown as Record<string, { evidence: string | null; sourceUrl: string | null }>;
+  for (const k of [...SCALAR_KEYS, ...LIST_KEYS]) {
+    const f = rec[k];
+    const item = f?.evidence ? itemForQuote(args.items, f.evidence, quoteIn) : null;
+    if (item) { f.sourceUrl = item.link; used.add(item.link); }
+  }
+  x.recentEvents = x.recentEvents.map((e) => {
+    const item = itemForQuote(args.items, e.evidence, quoteIn);
+    if (item) used.add(item.link);
+    return { ...e, sourceUrl: item?.link ?? e.sourceUrl, date: e.date ?? item?.date ?? null };
+  });
+  // Company identity must come from the website, never from a headline.
+  x.companyName = { value: null, evidence: null, sourceUrl: null };
+  x.productDescription = { value: null, evidence: null, sourceUrl: null };
+  x.isSoftwareProduct = { value: null, evidence: null, sourceUrl: null };
+  x.buyerType = { value: null, evidence: null, sourceUrl: null };
+  return { extraction: x, usedLinks: [...used] };
 }

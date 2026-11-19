@@ -8,7 +8,8 @@ import { Scraper, type PageResult } from "../scrape/fetch";
 import { SCRAPE, computeVerdict, type PageType, type VerdictResult } from "../rubric";
 import type { Facts } from "../facts";
 import { runQualificationLoop } from "./qualify";
-import { extractFacts } from "./extract";
+import { extractFacts, extractNewsFacts } from "./extract";
+import { fetchCompanyNews } from "../scrape/news";
 import { explainVerdict } from "./explain";
 import { findDecisionMaker } from "./contacts";
 import { choosePainPoints, type PainPoint } from "./painPoints";
@@ -70,7 +71,7 @@ async function processCompany(c: Company, log: DecisionLog, meter: TokenMeter): 
   if (c.resumeFrom === "contacts" || c.resumeFrom === "override_qualified") {
     // Resume from Step 4 using stored facts (contact uploaded, or human override of a gate-unknown verdict).
     facts = c.facts as Facts;
-    const visited = new Set<PageType>(log.fetchTrail.map((t) => t.pageType));
+    const visited = new Set<PageType>(log.fetchTrail.map((t) => t.pageType).filter((p): p is PageType => p !== "news_feed"));
     verdict = computeVerdict(facts, { now: new Date(), visited, newsFirstScreen: log.newsFirstScreen });
     if (c.resumeFrom === "override_qualified" && verdict.verdict !== "QUALIFIED") {
       verdict = { ...verdict, verdict: "QUALIFIED", flags: [...verdict.flags, "human_override"] };
@@ -86,7 +87,15 @@ async function processCompany(c: Company, log: DecisionLog, meter: TokenMeter): 
       deadline: Date.now() + SCRAPE.LOOP_TIME_BUDGET_MS,
       fetchPage: (url, pageType) => cachedFetch(scraper, c.id, url, pageType),
       extract: (url, pageType, cleaned) => extractFacts({ url, pageType, cleaned, domain: c.domain, meter }),
+      news: config.newsSource === "off" ? undefined : async (name, companyContext) => {
+        const result = await fetchCompanyNews(name, c.domain, config.newsSource);
+        if (!result) return null;
+        if (!result.items.length) return { result, extraction: null, usedLinks: [] };
+        const x = await extractNewsFacts({ items: result.items, name, domain: c.domain, companyContext, feedUrl: result.feedUrl, meter });
+        return { result, extraction: x.extraction, usedLinks: x.usedLinks };
+      },
     });
+    log.news = loop.news;
     log.fetchTrail = loop.trail;
     log.httpRequests = scraper.httpRequests;
     log.stopReason = loop.stopReason;

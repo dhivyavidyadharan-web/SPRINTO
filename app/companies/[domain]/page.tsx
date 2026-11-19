@@ -81,6 +81,28 @@ export default async function CompanyPage({ params }: { params: Promise<{ domain
             </tbody></table>
           </Card>
 
+          {log.news && (
+            <Card title={`In the news (${log.news.source === "google" ? "Google News" : "Bing News"} RSS)`}>
+              {log.news.items.length === 0 ? (
+                <p className="muted">{log.news.status === "error" ? `News feed unavailable (${log.news.error}).` : "No recent headlines name this company."}</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {log.news.items.map((n) => (
+                    <li key={n.link} className={`flex items-start gap-2 rounded-xl p-2 text-sm ${n.used ? "bg-zest-100 ring-1 ring-zest-300" : "opacity-70"}`}>
+                      <span className="mono shrink-0 text-[11px] text-ink-500">{n.date ?? "—"}</span>
+                      <div className="min-w-0 flex-1">
+                        <a href={n.link} target="_blank" rel="noreferrer" className="font-medium text-brand-900 hover:text-blush-600">{n.title}</a>
+                        <div className="text-[11px] text-ink-500">{n.publisher ?? ""}</div>
+                      </div>
+                      {n.used ? <Pill tone="green">used as evidence</Pill> : <span className="shrink-0 text-[11px] text-ink-500">not about them / no signal</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-xs text-ink-500">Headlines must name the company; the model then drops namesakes using the homepage description. A fact from news must quote the headline, and it links to the article. {log.news.filled.length ? `Filled: ${log.news.filled.join(", ")}.` : ""}</p>
+            </Card>
+          )}
+
           {log.contact && (
             <Card title="Decision-maker">
               {log.contact.chosen ? (

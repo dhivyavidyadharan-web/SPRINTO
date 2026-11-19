@@ -14,7 +14,7 @@ const ITEMS = [
   { href: "/cold", label: "Cold deals", icon: Snowflake, count: "cold" as const },
   { href: "/input-needed", label: "Input needed", icon: AlertTriangle, count: "inputNeeded" as const },
   { href: "/feedback", label: "Feedback loop", icon: Sparkles, count: "feedback" as const },
-  { href: "/rubric", label: "Rubric", icon: Scale },
+  { href: "/rubric", label: "Qualification rubric", icon: Scale },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

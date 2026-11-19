@@ -205,37 +205,36 @@ export interface VerdictResult {
   rationale: string; // deterministic one-line reason produced by code
 }
 
-export function computeVerdict(f: Facts, ctx: RubricContext): VerdictResult {
-  const gates = evaluateGates(f, ctx);
-  const signals = evaluateSignals(f, ctx);
-  const firedSignals = SIGNAL_IDS.filter((s) => signals[s].fired);
-  const score = firedSignals.reduce((n, s) => n + signals[s].points, 0);
-  const base = { gates, signals, firedSignals, score };
-
-  const failed = GATE_IDS.filter((g) => gates[g].status === "fail");
-  if (failed.length) {
-    return { ...base, verdict: "DISQUALIFIED", flags: [], inputNeededReason: null, rationale: `Gate(s) failed: ${failed.join(", ")}` };
-  }
-  if (gates.G1.status === "unknown") {
-    return { ...base, verdict: "INPUT_NEEDED", flags: [], inputNeededReason: "cannot_determine_product", rationale: "G1 unknown after fetch cap" };
-  }
-  if (gates.G2.status === "unknown") {
-    return { ...base, verdict: "INPUT_NEEDED", flags: [], inputNeededReason: "cannot_determine_buyer", rationale: "G2 unknown after fetch cap" };
-  }
+/**
+ * The verdict rule on its own (pure, no facts needed) — used by the pipeline AND by the
+ * dashboard's "try it" simulator, so the two can never disagree.
+ */
+export function decideVerdict(gates: Record<GateId, GateStatus>, firedSignals: SignalId[]): Omit<VerdictResult, "gates" | "signals"> {
+  const fired = SIGNAL_IDS.filter((s) => firedSignals.includes(s));
+  const score = fired.reduce((n, s) => n + SIGNALS[s].points, 0);
+  const base = { firedSignals: fired, score };
+  const failed = GATE_IDS.filter((g) => gates[g] === "fail");
+  if (failed.length) return { ...base, verdict: "DISQUALIFIED", flags: [], inputNeededReason: null, rationale: `Gate(s) failed: ${failed.join(", ")}` };
+  if (gates.G1 === "unknown") return { ...base, verdict: "INPUT_NEEDED", flags: [], inputNeededReason: "cannot_determine_product", rationale: "G1 unknown after fetch cap" };
+  if (gates.G2 === "unknown") return { ...base, verdict: "INPUT_NEEDED", flags: [], inputNeededReason: "cannot_determine_buyer", rationale: "G2 unknown after fetch cap" };
 
   const flags: string[] = [];
-  if (gates.G3.status === "unknown") flags.push(FLAGS.CERT_UNVERIFIED);
-  if (gates.G5.status === "unknown") flags.push(FLAGS.STAGE_UNVERIFIED);
-
-  const timing = firedSignals.filter((s) => TIMING_IDS.includes(s));
-  if (timing.length === 0) {
-    return { ...base, verdict: "NURTURE", flags, inputNeededReason: null, rationale: "Gates pass but no timing signal fired" };
-  }
+  if (gates.G3 === "unknown") flags.push(FLAGS.CERT_UNVERIFIED);
+  if (gates.G5 === "unknown") flags.push(FLAGS.STAGE_UNVERIFIED);
+  const timing = fired.filter((s) => TIMING_IDS.includes(s));
+  if (timing.length === 0) return { ...base, verdict: "NURTURE", flags, inputNeededReason: null, rationale: "Gates pass but no timing signal fired" };
   if (score < QUALIFY_MIN_SCORE) flags.push(FLAGS.LOW_SCORE);
   return {
     ...base, verdict: "QUALIFIED", flags, inputNeededReason: null,
     rationale: `Gates pass; timing ${timing.join("+")}; score ${score}${flags.length ? `; flags ${flags.join(", ")}` : ""}`,
   };
+}
+
+export function computeVerdict(f: Facts, ctx: RubricContext): VerdictResult {
+  const gates = evaluateGates(f, ctx);
+  const signals = evaluateSignals(f, ctx);
+  const statuses = Object.fromEntries(GATE_IDS.map((g) => [g, gates[g].status])) as Record<GateId, GateStatus>;
+  return { ...decideVerdict(statuses, SIGNAL_IDS.filter((s) => signals[s].fired)), gates, signals };
 }
 
 // ───────────────────────────── Sufficiency (drives the agent loop) ─────────────────────────────

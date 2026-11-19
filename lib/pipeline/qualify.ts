@@ -6,10 +6,11 @@ import { emptyFacts, mergeFacts, type Extraction, type Facts } from "../facts";
 import { discoverLinks, fallbackUrls, type Discovered } from "../scrape/discover";
 import { HARD_STOP, type PageResult } from "../scrape/fetch";
 import type { Cleaned } from "../scrape/clean";
+import type { NewsResult } from "../scrape/news";
 
 export interface FetchTrailEntry {
   iteration: number;
-  pageType: PageType;
+  pageType: PageType | "news_feed";
   url: string;
   method: string;
   status: string;
@@ -29,6 +30,16 @@ export interface LoopDeps {
   now?: Date;
   /** Epoch ms after which no more pages are fetched (decide with what is known). */
   deadline?: number;
+  /** Optional: news-feed research, run in parallel with the page loop and merged before the verdict. */
+  news?: (companyName: string, companyContext: string) => Promise<NewsStep | null>;
+}
+
+export interface NewsStep { result: NewsResult; extraction: Extraction | null; usedLinks: string[] }
+
+/** What the decision log keeps about the news check. */
+export interface NewsSummary {
+  source: string; feedUrl: string; status: string; error?: string; rawCount: number; filled: string[];
+  items: { title: string; link: string; publisher: string | null; date: string | null; used: boolean }[];
 }
 
 export interface LoopResult {
@@ -43,6 +54,7 @@ export interface LoopResult {
   newsFirstScreen?: string;
   homepageUrl: string;
   pageTexts: Record<string, string>;
+  news?: NewsSummary;
 }
 
 /**
@@ -75,6 +87,12 @@ export async function runQualificationLoop(domain: string, deps: LoopDeps): Prom
   facts = m0.facts;
   pageTexts[homepageUrl] = home.cleaned.mainText;
   trail.push({ iteration: 0, pageType: "homepage", url: homepageUrl, method: home.method, status: "ok", words: home.cleaned.wordCount, missingBefore: ["product", "buyer", "certs", "timing", "fit"], reason: "homepage is always fetched first", filled: m0.filled });
+
+  // ── News feed: start now (needs the company name), merge after the page loop.
+  const companyName = facts.companyName.value ?? (home.cleaned.title.split(/[|–—:-]/)[0].trim() || domain.split(".")[0]);
+  const newsP = deps.news
+    ? deps.news(companyName, [facts.productDescription.value, home.cleaned.title, home.cleaned.mainText.slice(0, 400)].filter(Boolean).join(" — ")).catch(() => null)
+    : Promise.resolve(null);
 
   // ── Discover candidate pages from homepage links; fall back to common paths.
   const discovered: Discovered = discoverLinks(home.cleaned.links, homepageUrl);
@@ -129,6 +147,31 @@ export async function runQualificationLoop(domain: string, deps: LoopDeps): Prom
     trail.push({ iteration, pageType: type, url: got.finalUrl, method: got.method, status: "ok", words: got.cleaned.wordCount, missingBefore: missing, reason, filled: m.filled, triedUrls: tried.length > 1 ? tried : undefined });
   }
 
+  let news: NewsSummary | undefined;
+  // Never let the news check push the request past its budget: wait at most until deadline + 8 s.
+  const waitMs = Math.max(3000, (deps.deadline ?? Date.now() + 30_000) + 8000 - Date.now());
+  const ns = await Promise.race([newsP, new Promise<null>((r) => setTimeout(() => r(null), waitMs))]);
+  if (!ns && deps.news) trail.push({ iteration: trail.length, pageType: "news_feed", url: "", method: "news RSS", status: "timeout", words: 0, missingBefore: [], reason: "news check did not finish within the time budget; decided without it", filled: [] });
+  if (ns) {
+    let filled: string[] = [];
+    if (ns.extraction) {
+      const m = mergeFacts(facts, ns.extraction);
+      facts = m.facts;
+      filled = m.filled;
+    }
+    const used = new Set(ns.usedLinks);
+    news = {
+      source: ns.result.source, feedUrl: ns.result.feedUrl, status: ns.result.status, error: ns.result.error, rawCount: ns.result.rawCount, filled,
+      items: ns.result.items.map((i) => ({ ...i, used: used.has(i.link) })),
+    };
+    trail.push({
+      iteration: trail.length, pageType: "news_feed", url: ns.result.feedUrl, method: `${ns.result.source} news RSS`,
+      status: ns.result.status === "error" ? "network_error" : "ok", words: ns.result.items.length, missingBefore: [],
+      reason: `news check: ${ns.result.items.length} headline(s) name the company (of ${ns.result.rawCount} returned); ${ns.usedLinks.length} used as evidence`,
+      filled,
+    });
+  }
+
   const verdict = computeVerdict(facts, { now, visited, newsFirstScreen });
-  return { outcome: "decided", facts, visited, available, trail, verdict, stopReason, newsFirstScreen, homepageUrl, pageTexts };
+  return { outcome: "decided", facts, visited, available, trail, verdict, stopReason, newsFirstScreen, homepageUrl, pageTexts, news };
 }

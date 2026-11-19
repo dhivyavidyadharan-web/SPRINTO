@@ -86,3 +86,19 @@ These are the choices made where the brief left room. Each one is easy to change
   - A time proposed before any slots were offered was counted as negotiation round 1. It's now treated as interest, so no round is used. A regression test was added.
 - **Email layout owned by code (2026-11-19, user feedback "everything is clammed together"):** the drafter now returns `hook / pain / value / cta` as separate fields. `lib/mail/layout.ts` assembles them as: greeting, a blank line, one paragraph per part, then "Best," with name and title. Every agent reply (scheduling, confirmation, decline, clarify, human-instruction) goes through the same `normalizeBody`. Each email also carries a minimal HTML version (one `<p>` per paragraph, the live-test footer set apart under a thin rule) so spacing renders reliably in Gmail. Plain text is still sent alongside.
 - **Second live reply (idukki.io):** "Hi, not needed" → not_interested (no_need, 0.99). One acknowledgement was sent and the company moved to BACKUP with a 90-day revisit.
+
+## News-headline check (Google News RSS), plain-English rubric page, company search (2026-11-19)
+- **What:** during qualification, a news check runs **in parallel** with the page loop (`lib/scrape/news.ts`, `extractNewsFacts`). It makes two searches: `"<name>" (startup OR software OR raises OR funding OR "SOC 2" …)` and `"<domain>"`. Search engines return **zero** results for nested OR-groups, so these can't be one query.
+  - Domain matches rank first. Name-only headlines must contain a business word.
+  - Results are limited to the last 365 days, at most 10 headlines.
+- **Grounding:** a fact from news must quote a headline verbatim, and its `sourceUrl` is the article link.
+  - The model gets the homepage description and is told to ignore namesakes. Tested live: the rice-farming "Rize" Series B is rejected for rize.io; Linear's $2.5B valuation headlines are used, while linear parks and linear TV are not.
+  - Company identity fields (name, product, buyer) never come from news.
+  - News can fill: certifications (a "X achieves SOC 2" headline fails G3), audits in progress, funding stage, and T6 events.
+- **Never blocks a decision:** the news wait is capped at deadline + 8 s. On error or timeout, the trail records it and the verdict uses the website alone. Linear end-to-end: 42 s.
+- **Terms caveat (flagged to the user):**
+  - news.google.com's robots.txt disallows `/rss`.
+  - Both Google's and Bing's feeds say they are for personal, non-commercial feed readers.
+  - This is acceptable for a live-test prototype, but a production deployment should use a licensed news API (e.g. a paid news-search API). `NEWS_SOURCE=google|bing|off` switches the source, and Bing is the automatic fallback.
+- **Rubric page** is rewritten in plain English: a 5-step flow, why each gate and signal matters, live counts (gates knocked out, signals seen) and a **"try it" simulator**. The simulator calls the same pure `decideVerdict()` the pipeline uses (`computeVerdict` now delegates to it), so the two can't drift apart.
+- **Company search bar** (top of every page, press `/`): finds existing companies by name or domain. Typing a website that isn't in the system offers **"Research <domain> now"**, which queues it and runs the steps inline, then opens its decision log.
