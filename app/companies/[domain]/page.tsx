@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { plainStep, stageLabel, cleanFeed } from "@/lib/plain";
+
+const VERDICT_TEXT: Record<string, string> = { QUALIFIED: "Qualified", DISQUALIFIED: "Not a fit", NURTURE: "Good fit, not ready yet", INPUT_NEEDED: "Needs your input", UNREACHABLE: "Website couldn't be read" };
+const FLAG_TEXT: Record<string, string> = { cert_status_unverified: "certification not confirmed", stage_unverified: "company size not confirmed", score_below_threshold: "weaker lead (low score)" };
 import { gmailLink } from "@/lib/mail";
 import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
@@ -32,7 +36,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ domain
           <div className="flex items-center gap-3"><h1 className="h1">{c.name ?? c.domain}</h1><StatusBadge status={c.status} /></div>
           <div className="muted"><a href={`https://${c.domain}`} target="_blank" rel="noreferrer" className="underline">{c.domain}</a> · updated {timeAgo(c.updatedAt)}{c.dryRun ? " · DRY RUN" : ""}</div>
         </div>
-        <a className="btn-secondary" href={`/api/companies/${c.domain}/log`}>Download decision log (JSON)</a>
+        <a className="btn-secondary" href={`/api/companies/${c.domain}/log`}>Download full log</a>
       </div>
 
       {c.status === "INPUT_NEEDED" && (
@@ -45,14 +49,13 @@ export default async function CompanyPage({ params }: { params: Promise<{ domain
         <>
           <Card title="Verdict">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-lg font-semibold">{log.verdict}</span>
+              <span className="text-lg font-semibold">{VERDICT_TEXT[log.verdict] ?? log.verdict}</span>
               <Pill tone="green">score {log.score}</Pill>
-              {log.flags.map((f) => <Pill key={f} tone="amber">{f}</Pill>)}
-              {log.inputNeededReason && <Pill tone="amber">{log.inputNeededReason}</Pill>}
+              {log.flags.map((f) => <Pill key={f} tone="amber">{FLAG_TEXT[f] ?? f.replace(/_/g, " ")}</Pill>)}
             </div>
             <p className="mt-2 text-sm leading-relaxed">{log.verdictReason}</p>
-            {log.codeRationale && <p className="mt-1 text-xs text-slate-500">Code rationale: {log.codeRationale}</p>}
-            {log.stopReason && <p className="text-xs text-slate-500">Loop stop: {log.stopReason} · HTTP requests: {log.httpRequests} · tokens {log.tokens?.in}/{log.tokens?.out} · est. ${log.estCostUsd}</p>}
+            {log.codeRationale && <p className="mt-1 hidden text-xs text-slate-500">Code rationale: {log.codeRationale}</p>}
+            {log.stopReason && <p className="hidden text-xs text-slate-500">Loop stop: {log.stopReason} · HTTP requests: {log.httpRequests} · tokens {log.tokens?.in}/{log.tokens?.out} · est. ${log.estCostUsd}</p>}
             {log.errors?.length > 0 && <details className="mt-2"><summary className="cursor-pointer text-xs text-red-600">{log.errors.length} error(s)</summary><pre className="mono whitespace-pre-wrap text-red-700">{log.errors.join("\n\n")}</pre></details>}
           </Card>
 
@@ -73,13 +76,13 @@ export default async function CompanyPage({ params }: { params: Promise<{ domain
             </Card>
           </div>
 
-          <Card title="Qualification loop — fetch trail">
+          <details className="card group"><summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-brand-900">Pages the agent read (technical, for auditing) ▾</summary><div className="px-5 pb-5">
             <table className="tbl"><thead><tr><th>#</th><th>Page</th><th>Why</th><th>Status</th><th>Words</th><th>Filled</th></tr></thead><tbody>
               {log.fetchTrail.map((t) => (
                 <tr key={t.iteration + t.url}><td>{t.iteration}</td><td><b>{t.pageType}</b><div><SourceLink url={t.url} /></div><div className="text-[11px] text-slate-400">{t.method}</div></td><td className="text-xs">{t.reason}<div className="text-slate-400">missing before: {t.missingBefore.join(", ") || "—"}</div></td><td><Pill tone={t.status === "ok" ? "green" : "red"}>{t.status}</Pill></td><td>{t.words}</td><td className="text-xs">{t.filled.join(", ") || "—"}</td></tr>
               ))}
             </tbody></table>
-          </Card>
+          </div></details>
 
           {log.news && (
             <Card title={`In the news (${log.news.source === "google" ? "Google News" : "Bing News"} RSS)`}>
@@ -159,20 +162,20 @@ export default async function CompanyPage({ params }: { params: Promise<{ domain
         <Card title="Conversation" right={<Link className="text-xs text-brand-700 underline" href="/conversations">All conversations</Link>}>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-2">
-              <div className="text-sm">Stage: <b>{conv.stage}</b> {conv.gmailThreadId && <a className="ml-2 text-xs text-brand-700 underline" target="_blank" rel="noreferrer" href={gmailLink(conv.gmailThreadId) ?? "#"}>Open in Gmail</a>}</div>
+              <div className="text-sm">Status: <b>{stageLabel(conv.stage)}</b> {conv.gmailThreadId && <a className="ml-2 text-xs text-brand-700 underline" target="_blank" rel="noreferrer" href={gmailLink(conv.gmailThreadId) ?? "#"}>Open in Gmail</a>}</div>
               {meetings.map((m) => <div key={m.id} className="text-sm font-semibold text-brand-800">📅 Meeting {fmtDate(m.startAt)}</div>)}
               {state && !state.done && !state.inputNeeded && <SimulateReply companyId={c.id} />}
-              <details><summary className="cursor-pointer text-xs text-slate-600">State object</summary><pre className="mono max-h-96 overflow-auto rounded bg-slate-50 p-2">{JSON.stringify({ ...state, history: undefined }, null, 2)}</pre></details>
+              <details className="hidden"><summary className="cursor-pointer text-xs text-slate-600">State object</summary><pre className="mono max-h-96 overflow-auto rounded bg-slate-50 p-2">{JSON.stringify({ ...state, history: undefined }, null, 2)}</pre></details>
             </div>
             <ol className="max-h-96 space-y-1 overflow-auto text-xs">
-              {(state?.history ?? []).slice().reverse().map((h, i) => <li key={i} className="border-l-2 border-slate-200 pl-2"><span className="text-slate-400">{fmtDate(h.ts)}</span> <b>{h.node}</b> · {h.action} — {h.result}</li>)}
+              {(state?.history ?? []).slice().reverse().map((h) => ({ h, t: plainStep(h) })).filter((x) => x.t).map(({ h, t }, i) => <li key={i} className="border-l-2 border-blush-200 pl-2"><span className="text-ink-500">{fmtDate(h.ts)}</span> · {t}</li>)}
             </ol>
           </div>
         </Card>
       )}
 
       <Card title="Activity timeline">
-        <ul className="space-y-1 text-xs">{events.map((e) => <li key={e.id}><span className="text-slate-400">{fmtDate(e.ts)}</span> <span className="font-semibold uppercase text-slate-500">{e.actor}</span> {e.type.replace(/_/g, " ")} <span className="text-slate-400">{JSON.stringify(e.payload).slice(0, 160)}</span></li>)}</ul>
+        <ul className="space-y-1 text-sm">{cleanFeed(events.map((e) => ({ e })), 30).map(({ e, text }) => <li key={e.id}><span className="text-ink-500">{fmtDate(e.ts)}</span> · {text}</li>)}</ul>
       </Card>
     </div>
   );

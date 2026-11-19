@@ -30,7 +30,7 @@ export default async function InputNeeded() {
                 {s && <div className="text-xs">Reply status <b>{s.replyStatus}</b> · round {s.negotiationRound} · offered {s.timesProposed.map((t) => fmtDate(t)).join(", ") || "—"}</div>}
                 {s?.lastReplyText && <div className="quote whitespace-pre-wrap">{s.lastReplyText}</div>}
                 {log?.email && !log.email.qualityGate.passed && <div className="text-xs text-red-700">Quality gate failures: {log.email.qualityGate.failures.map((f) => f.join("; ")).join(" | ")}</div>}
-                {s && <details><summary className="cursor-pointer text-xs text-slate-600">Full state</summary><pre className="mono max-h-72 overflow-auto rounded bg-slate-50 p-2">{JSON.stringify({ ...s, history: s.history?.slice(-15) }, null, 2)}</pre></details>}
+                {s && <details className="hidden"><summary className="cursor-pointer text-xs text-slate-600">Full state</summary><pre className="mono max-h-72 overflow-auto rounded bg-slate-50 p-2">{JSON.stringify({ ...s, history: s.history?.slice(-15) }, null, 2)}</pre></details>}
               </div>
               <InputActions companyId={c.id} isConversation={!!s && !s.done} reason={reason} />
             </div>

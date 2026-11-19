@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { plainStep, stageLabel } from "@/lib/plain";
 import { gmailLink } from "@/lib/mail";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -25,15 +26,17 @@ export default async function Conversations() {
               <div className="space-y-1 text-sm">
                 <div>{s?.contactName} · {s?.contactTitle}</div>
                 <div className="flex flex-wrap gap-1">
-                  <Pill tone="blue">{s?.replyStatus ?? "no_reply"}</Pill><Pill>round {s?.negotiationRound ?? 0}</Pill><Pill>follow-ups {s?.followupsSent ?? 0}</Pill><Pill tone={s?.meetingStatus === "confirmed" ? "green" : "slate"}>{s?.meetingStatus}</Pill>
-                  {s?.inputNeeded && <Pill tone="amber">input needed: {s.inputNeededReason}</Pill>}
+                  <Pill tone="blue">{stageLabel(conv.stage)}</Pill>
+                  {(s?.followupsSent ?? 0) > 0 && <Pill>{s?.followupsSent} follow-up{s?.followupsSent === 1 ? "" : "s"} sent</Pill>}
+                  {s?.meetingStatus === "confirmed" && <Pill tone="green">meeting confirmed</Pill>}
+                  {s?.inputNeeded && <Pill tone="amber">needs you: {s.inputNeededReason}</Pill>}
                 </div>
                 {s?.timesProposed?.length ? <div className="text-xs">Offered: {s.timesProposed.map((t) => fmtDate(t)).join(" · ")}</div> : null}
-                {s?.rejectedTimes?.length ? <div className="text-xs text-slate-500">Rejected: {s.rejectedTimes.length}</div> : null}
+                
                 {conv.gmailThreadId ? <a className="text-xs text-brand-700 underline" target="_blank" rel="noreferrer" href={gmailLink(conv.gmailThreadId) ?? "#"}>Open in Gmail</a> : <span className="text-xs text-slate-400">dry run (nothing sent)</span>}
               </div>
               <ol className="max-h-56 space-y-1 overflow-auto text-xs lg:col-span-1">
-                {(s?.history ?? []).slice(-12).reverse().map((h, i) => <li key={i} className="border-l-2 border-slate-200 pl-2"><span className="text-slate-400">{timeAgo(h.ts)}</span> <b>{h.node}</b> — {h.result}</li>)}
+                {(s?.history ?? []).slice().reverse().map((h) => ({ h, t: plainStep(h) })).filter((x) => x.t).slice(0, 8).map(({ h, t }, i) => <li key={i} className="border-l-2 border-blush-200 pl-2"><span className="text-ink-500">{timeAgo(h.ts)}</span> · {t}</li>)}
               </ol>
               <div>{s && !s.done && !s.inputNeeded ? <SimulateReply companyId={c.id} /> : <p className="muted">{s?.done ? "Conversation closed." : s?.inputNeeded ? "Paused — see Input needed." : ""}</p>}</div>
             </div>

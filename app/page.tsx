@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cleanFeed } from "@/lib/plain";
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { Building2, BadgeCheck, Send, CalendarCheck2, AlertTriangle, Coins, Snowflake, Sparkles, Bot, User, Clock, ArrowRight, CalendarDays } from "lucide-react";
 import { db, schema } from "@/lib/db";
@@ -18,19 +19,6 @@ const EMAILED = ["EMAILED", "FOLLOWUP_1_SENT", "FOLLOWUP_2_SENT", "IN_CONVERSATI
 const ACTOR_ICON: Record<string, React.ReactNode> = {
   agent: <Bot size={13} />, pipeline: <Sparkles size={13} />, human: <User size={13} />, cron: <Clock size={13} />,
 };
-const EVENT_LABELS: Record<string, string> = {
-  enqueued: "added to the queue", processing_started: "research started", qualified_verdict: "verdict decided",
-  qualified_continue_outreach: "qualified — moving to outreach", contact_chosen: "decision-maker chosen", cold_email_sent: "cold email sent",
-  conversation_started: "conversation started", resume_reply: "reply received", resume_no_reply_check: "checked for silence",
-  positive_reply: "positive reply", email_scheduling: "times proposed", email_confirmation: "meeting confirmed by email",
-  calendly_booking: "booked in Calendly", stage_booked: "meeting booked", email_decline_ack: "decline acknowledged",
-  stage_declined: "moved to Backup (declined)", stage_backup: "moved to Backup", stage_unsubscribed: "unsubscribed",
-  email_clarify: "asked a clarifying question", followup_1_sent: "follow-up 1 sent", followup_2_sent: "follow-up 2 sent",
-  input_needed: "needs your input", daily_jobs_ran: "daily jobs ran", feedback_submitted: "feedback given",
-  feedback_distilled: "rules learned from feedback", reengage_requested: "re-engaged", unreachable: "site unreachable",
-  requeued_after_revisit: "revisit date reached — re-queued", pipeline_error: "pipeline error", send_failed: "send failed",
-};
-const label = (t: string) => EVENT_LABELS[t] ?? t.replace(/_/g, " ");
 
 const ACTOR_STYLE: Record<string, string> = {
   agent: "bg-blush-100 text-blush-700", pipeline: "bg-lavender-200 text-brand-800", human: "bg-zest-200 text-brand-900", cron: "bg-sky-100 text-sky-800",
@@ -41,7 +29,8 @@ export default async function Overview() {
   const by = Object.fromEntries((counts.rows as { status: string; n: number }[]).map((r) => [r.status, r.n])) as Record<string, number>;
   const replied = ((await db().execute(sql`SELECT count(DISTINCT company_id)::int AS n FROM events WHERE type = 'resume_reply'`)).rows[0] as { n: number }).n;
   const tokens = (await db().execute(sql`SELECT coalesce(sum((decision_log->'tokens'->>'in')::int + (decision_log->'tokens'->>'out')::int),0)::int AS t, coalesce(sum((decision_log->>'estCostUsd')::float),0)::float AS c FROM companies WHERE decision_log IS NOT NULL`)).rows[0] as { t: number; c: number };
-  const events = await db().select({ e: schema.events, domain: schema.companies.domain, name: schema.companies.name }).from(schema.events).leftJoin(schema.companies, eq(schema.events.companyId, schema.companies.id)).orderBy(desc(schema.events.id)).limit(14);
+  const rawEvents = await db().select({ e: schema.events, domain: schema.companies.domain, name: schema.companies.name }).from(schema.events).leftJoin(schema.companies, eq(schema.events.companyId, schema.companies.id)).orderBy(desc(schema.events.id)).limit(120);
+  const events = cleanFeed(rawEvents, 12);
   const meetings = await db().select({ m: schema.meetings, c: schema.companies }).from(schema.meetings).innerJoin(schema.companies, eq(schema.meetings.companyId, schema.companies.id)).where(gte(schema.meetings.startAt, new Date(Date.now() - 3_600_000))).orderBy(schema.meetings.startAt).limit(4);
   const cold = await coldDeals();
   const fq = await feedbackQueue(50);
@@ -179,11 +168,11 @@ export default async function Overview() {
       <Card title="Recent activity" delay={380}>
         {events.length === 0 ? <p className="muted">No activity yet — go to <Link href="/run" className="text-blush-600 underline">Run</Link> to queue domains.</p> : (
           <ol className="relative space-y-1 border-l-2 border-blush-100 pl-5">
-            {events.map(({ e, domain, name }, i) => (
+            {events.map(({ e, domain, name, text }, i) => (
               <li key={e.id} className="reveal relative py-1 text-sm" style={{ animationDelay: `${420 + i * 35}ms` }}>
                 <span className={`absolute -left-[31px] top-1.5 grid h-5 w-5 place-items-center rounded-full ring-4 ring-white ${ACTOR_STYLE[e.actor] ?? "bg-cream-200"}`}>{ACTOR_ICON[e.actor]}</span>
-                <span className="text-ink-700">{domain ? <Link className="font-semibold text-brand-800 hover:text-blush-600" href={`/companies/${domain}`}>{name ?? domain}</Link> : <span className="font-semibold text-ink-500">System</span>}</span>
-                <span className="text-ink-700"> · {label(e.type)}</span>
+                <span className="text-ink-700">{domain ? <Link className="font-semibold text-brand-800 hover:text-blush-600" href={`/companies/${domain}`}>{name ?? domain}</Link> : <span className="font-semibold text-ink-500">Agent</span>}</span>
+                <span className="text-ink-700"> · {text}</span>
                 <span className="ml-2 text-xs text-ink-500">{timeAgo(e.ts)}</span>
               </li>
             ))}

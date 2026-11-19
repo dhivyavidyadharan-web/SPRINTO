@@ -42,7 +42,7 @@ export default async function Board() {
                       <div className="flex items-center justify-between gap-2"><span className="truncate font-semibold">{c.name ?? c.domain}</span>{c.score !== null && <span className="rounded bg-brand-50 px-1.5 text-xs font-bold text-brand-800">{c.score}</span>}</div>
                       <div className="truncate text-xs text-slate-500">{c.domain}</div>
                       {log?.contact?.chosen && <div className="mt-1 truncate text-xs">{log.contact.chosen.name} · {log.contact.chosen.title}</div>}
-                      {c.flags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{c.flags.map((f) => <span key={f} className="rounded bg-amber-100 px-1 text-[10px] text-amber-900">{f}</span>)}</div>}
+                      {c.flags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{c.flags.map((f) => <span key={f} title={f} className="rounded bg-amber-100 px-1 text-[10px] text-amber-900">{({ cert_status_unverified: "cert not confirmed", stage_unverified: "size not confirmed", score_below_threshold: "low score" } as Record<string, string>)[f] ?? f}</span>)}</div>}
                       {c.status === "INPUT_NEEDED" && c.inputNeededReason && <div className="mt-1 text-xs font-medium text-amber-800">{c.inputNeededReason}</div>}
                       {(c.status === "BACKUP" || c.status === "NURTURE") && <div className="mt-1 text-xs text-violet-700">Revisit {fmtDate(c.revisitAfter)}{c.backupReason ? ` · ${c.backupReason}` : ""}</div>}
                       <div className="mt-1 text-[11px] text-slate-400">Last activity {timeAgo(lastAct.get(c.id) ?? c.updatedAt)}</div>
