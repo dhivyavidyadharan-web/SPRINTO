@@ -1,6 +1,6 @@
 import { Annotation } from "@langchain/langgraph";
 
-export type ReplyStatus = "no_reply" | "interested" | "not_interested" | "counter_proposal" | "confirmed" | "unclear" | "unsubscribe";
+export type ReplyStatus = "no_reply" | "interested" | "not_interested" | "counter_proposal" | "confirmed" | "unclear" | "unsubscribe" | "needs_human";
 export type MeetingStatus = "unscheduled" | "pending_confirmation" | "confirmed";
 export interface HistoryEntry { ts: string; node: string; action: string; result: string }
 

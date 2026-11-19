@@ -20,7 +20,7 @@ export const POST = handler(async (req: Request, { params }: { params: Promise<{
     return json({ ok: true, note: "Queued — run the pipeline to research it again and send a fresh email if it still qualifies." });
   }
   if (action === "dnc") {
-    await db().update(schema.companies).set({ status: "DO_NOT_CONTACT", updatedAt: new Date() }).where(eq(schema.companies.id, id));
+    await db().update(schema.companies).set({ status: "DO_NOT_CONTACT", revisitAfter: null, updatedAt: new Date() }).where(eq(schema.companies.id, id));
     await logEvent(id, "human", "marked_do_not_contact", {});
     return json({ ok: true });
   }

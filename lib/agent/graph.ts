@@ -71,6 +71,7 @@ export function buildGraph(d: AgentDeps, checkpointer?: BaseCheckpointSaver) {
         replyStatus: status, prospectProposedTime: c.prospectProposedTime, acceptedSlot: c.acceptedSlot && s.timesProposed.includes(c.acceptedSlot) ? c.acceptedSlot : null,
         declineReason: c.declineReason, lastReplyText: ev.replyText, lastRfcMessageId: ev.rfcMessageId ?? s.lastRfcMessageId,
         processedMessageIds: [...s.processedMessageIds, ev.messageId], lastActivityAt: d.now().toISOString(),
+        ...(status === "needs_human" ? { pendingAction: `needs_human: ${c.humanNote?.trim() || "prospect needs a human answer"}` } : {}),
         history: [h("classifyReply", "classified", `${status} (confidence ${c.confidence}${c.prospectProposedTime ? `, proposed ${c.prospectProposedTime}` : ""}${c.acceptedSlot ? `, accepted ${c.acceptedSlot}` : ""})`, d.now())],
       };
       if (s.replyStatus === "no_reply" && ["interested", "counter_proposal", "confirmed"].includes(status)) {
@@ -239,6 +240,7 @@ export function buildGraph(d: AgentDeps, checkpointer?: BaseCheckpointSaver) {
           return s.timesProposed.length ? (s.clarifyAsked ? "flagInputNeeded" : "askClarification") : "checkCalendar";
         case "not_interested": return "handleDecline";
         case "unsubscribe": return "unsubscribe";
+        case "needs_human": return "flagInputNeeded";
         default: return s.clarifyAsked ? "flagInputNeeded" : "askClarification";
       }
     }, ["checkProposedSlot", "checkCalendar", "handleCounter", "setSlotFromAccepted", "askClarification", "flagInputNeeded", "handleDecline", "unsubscribe"])
@@ -297,6 +299,7 @@ export function buildGraph(d: AgentDeps, checkpointer?: BaseCheckpointSaver) {
 
 function inputReason(s: State, d: AgentDeps): string {
   if (s.negotiationRound > d.config.maxRounds) return `no time agreed after ${d.config.maxRounds} rounds`;
+  if (s.pendingAction?.startsWith("needs_human: ")) return s.pendingAction.slice("needs_human: ".length);
   switch (s.pendingAction) {
     case "no_calendar_access": return "reconnect Google";
     case "unavailable": return "calendar unavailable";

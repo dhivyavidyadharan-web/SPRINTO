@@ -37,7 +37,8 @@ function checkpointer(): Promise<BaseCheckpointSaver> {
 
 // ───────────── Real dependencies ─────────────
 const ClassifySchema = z.object({
-  replyStatus: z.enum(["interested", "not_interested", "counter_proposal", "confirmed", "unclear", "unsubscribe"]),
+  replyStatus: z.enum(["interested", "not_interested", "counter_proposal", "confirmed", "unclear", "unsubscribe", "needs_human"]),
+  humanNote: z.string().nullable(),
   prospectProposedTime: z.string().nullable(),
   acceptedSlot: z.string().nullable(),
   declineReason: z.enum(["not_now", "no_need", "using_competitor", "no_budget", "other"]).nullable(),
@@ -65,8 +66,10 @@ replyStatus:
 - "counter_proposal": none of the offered times work and/or they propose a different time (set prospectProposedTime if a specific time is given)
 - "not_interested": declines (set declineReason)
 - "unsubscribe": explicitly asks to stop emailing / unsubscribe / remove them
+- "needs_human": they point us to a DIFFERENT person ("talk to our CISO", "not the right person", a forwarded intro), OR they ask something a scheduling assistant must not answer (pricing/quotes, contract or legal terms, whether Sprinto supports a specific framework/feature/integration, security questionnaires). Takes priority over "interested" and "not_interested" ("not the right person, ask X" is a referral, not a decline). Set humanNote to one short line for the sales lead, e.g. "Referred to Priya, Head of Security" or "Asks pricing for 40 employees + FedRAMP support".
 - "unclear": cannot tell
 prospectProposedTime: ISO 8601 with offset, interpreted in ${config.timezone} (today is ${z0.weekday} ${z0.y}-${String(z0.m).padStart(2, "0")}-${String(z0.d).padStart(2, "0")}), or null if no specific day+time.
+humanNote: null unless replyStatus is "needs_human".
 confidence: 0..1. Return JSON only.`,
         prompt: `Offered slots (ISO): ${JSON.stringify(s.timesProposed)}\nOffered (human-readable): ${s.timesProposed.map((t) => formatSlot(t)).join(" | ") || "none yet"}\n\nReply:\n"""${replyText.slice(0, 3000)}"""`,
       }) as Promise<ClassifyResult>;
@@ -94,6 +97,13 @@ confidence: 0..1. Return JSON only.`,
       return m ? { id: m.calendarEventId ?? `meeting-${m.id}` } : null;
     },
     async createEvent(s, slotIso) {
+      const endIso = new Date(new Date(slotIso).getTime() + config.meetingMinutes * 60_000).toISOString();
+      const co = await companyContext(s.companyId);
+      if (co.dryRun || config.dryRunEnv) {
+        // Dry run never touches the real calendar.
+        await logEvent(s.companyId, "agent", "calendly_booking", { mode: "dry_run", eventId: null, note: "dry run: no Calendly booking made" });
+        return { eventId: `dry-run-${Date.now()}`, endIso };
+      }
       const r = await bookSlot({ slotIso, contactName: s.contactName, companyId: s.companyId });
       await logEvent(s.companyId, "agent", "calendly_booking", { mode: r.mode, eventId: r.eventId, note: r.note });
       return { eventId: r.eventId, endIso: new Date(new Date(slotIso).getTime() + config.meetingMinutes * 60_000).toISOString() };

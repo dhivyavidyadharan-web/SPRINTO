@@ -125,3 +125,11 @@ These are the choices made where the brief left room. Each one is easy to change
 - **Live state at launch:** only 2 emails have outcomes (Rize booked, Idukki declined). That's not enough for A or C yet, and the page shows progress toward each threshold. Experiment #1 (CTA style) started, so every new cold email now feeds it. Live checks:
   - verdict review on linear.app → "keep" (ISO 27001 on its security page);
   - the arm-B (soft CTA) draft for Rize passed the quality gate.
+
+## Full button test (2026-11-19)
+Every button on every page was clicked against dry-run test companies (`*.test`), which were then deleted. All buttons work. Fixes from the test:
+- **Dry run could still book a real Calendly event.** `createEvent` now skips Calendly when the company or env is dry run, and logs `calendly_booking {mode: dry_run}`.
+- **A referral counted as a decline.** "Not the right person, talk to Priya" sent the company to Backup for 90 days. The new reply class `needs_human` covers referrals and questions a scheduler must not answer (pricing, contracts, specific framework or feature support). It goes to Input needed with a one-line note, e.g. "Referred to Priya, Head of Security". A regression test was added.
+- **Do not contact kept a revisit countdown.** The revisit date is now cleared, and the Cold deals table never shows one for DNC.
+- **Trial rules showed "Re-activate"** on the Feedback page. They now show "Make live now" and "Drop".
+- **Search briefly said "No company called X yet"** while the results were loading. It now shows "Searching…", and the "Research now" option waits for the search to finish.

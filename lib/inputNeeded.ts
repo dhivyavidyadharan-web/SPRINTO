@@ -50,7 +50,7 @@ export async function applyInputAction(companyId: number, a: InputAction) {
       await set({ status: "BACKUP", backupReason: "human_moved", revisitAfter: new Date(Date.now() + config.backupRevisitNoReplyMs), inputNeededReason: null });
       return { ok: true };
     case "do_not_contact":
-      await set({ status: "DO_NOT_CONTACT", inputNeededReason: null });
+      await set({ status: "DO_NOT_CONTACT", inputNeededReason: null, revisitAfter: null });
       return { ok: true };
     case "mark_booked": {
       const start = new Date(a.slotIso);

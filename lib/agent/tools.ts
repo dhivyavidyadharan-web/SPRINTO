@@ -16,7 +16,9 @@ export const TOOL_DESCRIPTIONS = {
 } as const;
 
 export interface ClassifyResult {
-  replyStatus: "interested" | "not_interested" | "counter_proposal" | "confirmed" | "unclear" | "unsubscribe";
+  replyStatus: "interested" | "not_interested" | "counter_proposal" | "confirmed" | "unclear" | "unsubscribe" | "needs_human";
+  /** For needs_human: one line for the Growth Lead, e.g. "Referred to Priya, Head of Security". */
+  humanNote?: string | null;
   prospectProposedTime: string | null;
   acceptedSlot: string | null;
   declineReason: "not_now" | "no_need" | "using_competitor" | "no_budget" | "other" | null;

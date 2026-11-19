@@ -20,6 +20,7 @@ export function CompanySearch() {
   const path = usePathname();
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
+  const [searchedFor, setSearchedFor] = useState("");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
@@ -40,13 +41,15 @@ export function CompanySearch() {
   }, []);
 
   useEffect(() => {
-    if (q.trim().length < 2) { setHits([]); return; }
+    if (q.trim().length < 2) { setHits([]); setSearchedFor(""); return; }
+    const term = q.trim();
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/companies/search?q=${encodeURIComponent(q.trim())}`);
+        const r = await fetch(`/api/companies/search?q=${encodeURIComponent(term)}`);
         const j = await r.json();
         setHits(j.results ?? []);
       } catch { setHits([]); }
+      setSearchedFor(term);
     }, 180);
     return () => clearTimeout(t);
   }, [q]);
@@ -56,6 +59,7 @@ export function CompanySearch() {
   const domain = toDomain(q);
   const isDomain = DOMAIN_RE.test(domain);
   const exists = hits.some((h) => h.domain === domain);
+  const loading = q.trim().length >= 2 && searchedFor !== q.trim();
 
   async function research() {
     setBusy(domain); setMsg("Queued. Reading the website and the news…");
@@ -110,7 +114,7 @@ export function CompanySearch() {
               ))}
             </ul>
           )}
-          {isDomain && !exists && (
+          {isDomain && !exists && (!loading || !!busy) && (
             <button disabled={!!busy} onClick={research} className="flex w-full items-center gap-3 border-t border-brand-50 bg-gradient-to-r from-blush-50 to-lavender-100 px-4 py-3 text-left text-sm hover:from-blush-100">
               {busy ? <Loader2 size={16} className="animate-spin text-blush-600" /> : <Sparkles size={16} className="text-blush-600" />}
               <span className="font-semibold text-brand-900">{busy ? `Researching ${domain}…` : `Research ${domain} now`}</span>
@@ -118,7 +122,8 @@ export function CompanySearch() {
               {!busy && <ArrowRight size={15} className="ml-auto text-blush-600" />}
             </button>
           )}
-          {!isDomain && hits.length === 0 && (
+          {loading && hits.length === 0 && <div className="flex items-center gap-2 px-4 py-3 text-sm text-ink-500"><Loader2 size={14} className="animate-spin" /> Searching…</div>}
+          {!loading && !isDomain && hits.length === 0 && (
             <div className="px-4 py-3 text-sm text-ink-500">No company called “{q.trim()}” yet. Type its website (for example <span className="mono">{q.trim().toLowerCase().replace(/\s+/g, "")}.com</span>) to research it.</div>
           )}
           {msg && <div className="border-t border-brand-50 px-4 py-2 text-xs text-brand-800">{msg}</div>}

@@ -65,7 +65,7 @@ export async function coldDeals(): Promise<ColdDeal[]> {
       companyId: c.id, domain: c.domain, name: c.name ?? c.domain, kind, reason,
       contact: log?.contact?.chosen?.name ?? null, contactTitle: log?.contact?.chosen?.title ?? null,
       score: c.score, emailsSent: sentBy.get(c.id) ?? 0, lastReply: st?.lastReplyText ?? null,
-      lastActivity: conv?.lastActivityAt ?? c.updatedAt, revisitAfter: c.revisitAfter,
+      lastActivity: conv?.lastActivityAt ?? c.updatedAt, revisitAfter: c.status === "DO_NOT_CONTACT" ? null : c.revisitAfter,
     };
   });
 }

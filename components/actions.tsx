@@ -267,9 +267,10 @@ export function RuleRow({ id, kind, text, status }: { id: number; kind: string; 
     <div className="flex items-center gap-2">
       <span className="flex-1">{text}</span>
       <button className="btn-secondary !px-2 !py-0.5 text-xs" onClick={() => setEditing(true)}>Edit</button>
-      {status === "active"
-        ? <button className="btn-danger !px-2 !py-0.5 text-xs" onClick={() => patch({ status: "retired" })}>Retire</button>
-        : <button className="btn-secondary !px-2 !py-0.5 text-xs" onClick={() => patch({ status: "active" })}>Re-activate</button>}
+      {status === "trial" && <button className="btn-secondary !px-2 !py-0.5 text-xs" onClick={() => patch({ status: "active" })}>Make live now</button>}
+      {status === "retired"
+        ? <button className="btn-secondary !px-2 !py-0.5 text-xs" onClick={() => patch({ status: "active" })}>Re-activate</button>
+        : <button className="btn-danger !px-2 !py-0.5 text-xs" onClick={() => patch({ status: "retired" })}>{status === "trial" ? "Drop" : "Retire"}</button>}
       <span className="hidden">{kind}</span>
     </div>
   );

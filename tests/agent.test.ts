@@ -113,6 +113,18 @@ describe("reply & scheduling agent", () => {
     expect(h.outcomes).toEqual(["negative"]);
   });
 
+  it("referral or a question it must not answer → Input needed with a note, no email, not a decline", async () => {
+    const h = harness({ classify: [cls("needs_human", { humanNote: "Referred to Priya, Head of Security" })] });
+    await h.start();
+    await h.reply("I'm not the right person, please talk to Priya, our Head of Security.");
+    const s = await h.state();
+    expect(s.inputNeeded).toBe(true);
+    expect(s.inputNeededReason).toBe("Referred to Priya, Head of Security");
+    expect(h.crm.at(-1)).toBe("INPUT_NEEDED");
+    expect(h.sent).toHaveLength(0);
+    expect(h.outcomes).toEqual([]);
+  });
+
   it("unsubscribe → Do not contact, no email", async () => {
     const h = harness({ classify: [cls("unsubscribe")] });
     await h.start();
