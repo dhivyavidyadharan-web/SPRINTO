@@ -34,7 +34,7 @@ export function usePipelineRunner(onStep?: () => void) {
   return { running, log, run, stop: () => { stop.current = true; } };
 }
 
-export function ActionButtons() {
+export function ActionButtons({ hero = false }: { hero?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
@@ -48,12 +48,12 @@ export function ActionButtons() {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-        <button className="btn-primary" disabled={runner.running} onClick={runner.run}>{runner.running ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />} {runner.running ? `Running… (${runner.log.length} done)` : "Run pipeline"}</button>
-        <button className="btn-secondary" disabled={!!busy} onClick={() => act("Check replies", "/api/replies/check")}>{busy === "Check replies" ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Check replies now</button>
-        <button className="btn-secondary" disabled={!!busy} onClick={() => act("Daily jobs", "/api/jobs/daily")}>{busy === "Daily jobs" ? <Loader2 size={16} className="animate-spin" /> : <CalendarClock size={16} />} Run daily jobs now</button>
+        <button className={hero ? "btn-zest" : "btn-primary"} disabled={runner.running} onClick={runner.run}>{runner.running ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />} {runner.running ? `Running… (${runner.log.length} done)` : "Run pipeline"}</button>
+        <button className={hero ? "btn-ghost-light" : "btn-secondary"} disabled={!!busy} onClick={() => act("Check replies", "/api/replies/check")}>{busy === "Check replies" ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Check replies now</button>
+        <button className={hero ? "btn-ghost-light" : "btn-secondary"} disabled={!!busy} onClick={() => act("Daily jobs", "/api/jobs/daily")}>{busy === "Daily jobs" ? <Loader2 size={16} className="animate-spin" /> : <CalendarClock size={16} />} Run daily jobs now</button>
       </div>
-      {msg && <div className="muted">{msg}</div>}
-      {runner.log.length > 0 && <div className="muted">Last: {runner.log.slice(-3).map((l) => `${l.domain ?? ""} → ${l.status}`).join(" · ")}</div>}
+      {msg && <div className={hero ? "text-sm text-white/80" : "muted"}>{msg}</div>}
+      {runner.log.length > 0 && <div className={hero ? "text-sm text-white/80" : "muted"}>Last: {runner.log.slice(-3).map((l) => `${l.domain ?? ""} → ${l.status}`).join(" · ")}</div>}
     </div>
   );
 }
