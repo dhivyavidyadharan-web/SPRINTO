@@ -9,6 +9,7 @@ import nodemailer from "nodemailer";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { config } from "../env";
+import { toHtml } from "./layout";
 
 export class RecipientNotAllowedError extends Error {}
 
@@ -63,7 +64,7 @@ export interface SendResult {
   error?: string;
 }
 
-export interface OutgoingMail { from: string; to: string; subject: string; text: string; messageId: string; inReplyTo?: string; references?: string }
+export interface OutgoingMail { from: string; to: string; subject: string; text: string; html?: string; messageId: string; inReplyTo?: string; references?: string }
 export type SmtpSend = (m: OutgoingMail) => Promise<void>;
 
 let smtpSend: SmtpSend = async (m) => {
@@ -74,7 +75,7 @@ let smtpSend: SmtpSend = async (m) => {
     connectionTimeout: 15_000, socketTimeout: 20_000,
   });
   await t.sendMail({
-    from: { name: config.senderName, address: m.from }, to: m.to, subject: m.subject, text: m.text,
+    from: { name: config.senderName, address: m.from }, to: m.to, subject: m.subject, text: m.text, html: m.html,
     messageId: m.messageId, inReplyTo: m.inReplyTo, references: m.references,
   });
 };
@@ -89,7 +90,9 @@ function isTransient(e: unknown) {
 
 export async function sendEmail(p: SendParams): Promise<SendResult> {
   const to = assertRecipient(p.to); // throws for any non-MY_EMAIL recipient
-  const finalBody = p.intendedRecipient ? `${p.body}${liveTestFooter(p.intendedRecipient)}` : p.body;
+  const footer = p.intendedRecipient ? liveTestFooter(p.intendedRecipient) : "";
+  const finalBody = `${p.body}${footer}`;
+  const html = toHtml(p.body, footer.replace(/^\s*—\s*/, "") || undefined);
   const messageId = newMessageId();
   const threadId = p.threadId ?? messageId;
   if (p.dryRun || config.dryRunEnv) {
@@ -101,7 +104,7 @@ export async function sendEmail(p: SendParams): Promise<SendResult> {
   for (let i = 0; i < 3; i++) { // 1 try + 2 retries on transient errors
     attempts++;
     try {
-      await smtpSend({ from: config.gmailUser || to, to, subject: p.subject, text: finalBody, messageId, inReplyTo: p.inReplyTo ?? undefined, references });
+      await smtpSend({ from: config.gmailUser || to, to, subject: p.subject, text: finalBody, html, messageId, inReplyTo: p.inReplyTo ?? undefined, references });
       return { status: "sent", messageId, threadId, rfcMessageId: messageId, finalBody, attempts };
     } catch (e) {
       lastErr = e;

@@ -10,6 +10,7 @@ import { buildGraph } from "./graph";
 import type { AgentDeps, ClassifyResult } from "./tools";
 import type { ResumeEvent, State } from "./state";
 import { sendEmail, fetchReplies, stripQuoted } from "../mail";
+import { normalizeBody } from "../mail/layout";
 import { computeOpenSlots, formatSlot, pickTwoSlots, zonedParts } from "../calendar/slots";
 import { bookSlot, busyIntervals, classifyCalendarError, slotLink } from "../calendar/calendly";
 import { draftFollowup } from "../pipeline/draft";
@@ -102,6 +103,7 @@ confidence: 0..1. Return JSON only.`,
       const contact = log?.contact?.chosen;
       const subject = s.coldSubject ? (s.coldSubject.startsWith("Re:") ? s.coldSubject : `Re: ${s.coldSubject}`) : "Re: Sprinto";
       const dryRun = c.dryRun || config.dryRunEnv;
+      body = normalizeBody(body, config.senderName, config.senderTitle);
       const r = await sendEmail({
         subject, body, threadId: s.gmailThreadId, inReplyTo: s.lastRfcMessageId, dryRun,
         intendedRecipient: { fullName: contact?.name ?? s.contactName, email: contact?.email ?? null, title: contact?.title ?? s.contactTitle, company: s.companyName },

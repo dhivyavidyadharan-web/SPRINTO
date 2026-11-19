@@ -49,7 +49,7 @@ describe("drafter receives active rules", () => {
     vi.doMock("@/lib/llm/gemini", () => ({
       generateJson: async (o: { prompt: string }) => {
         calls.push(o);
-        return { subject: "Your GRC Lead role", body: "Hi Priya,\n\nSaw the GRC Lead role.\n\nTest Sender\nGrowth, Sprinto", hookSignalId: "T1", hookQuote: "We are hiring a GRC Lead", painPointIdsUsed: ["first_compliance_hire_overloaded"], rulesApplied: ["R3", "R99"] };
+        return { subject: "Your GRC Lead role", hook: "Saw the GRC Lead role.", pain: "", value: "", cta: "Open to a call?", hookSignalId: "T1", hookQuote: "We are hiring a GRC Lead", painPointIdsUsed: ["first_compliance_hire_overloaded"], rulesApplied: ["R3", "R99"] };
       },
     }));
     const { draftColdEmail } = await import("@/lib/pipeline/draft");

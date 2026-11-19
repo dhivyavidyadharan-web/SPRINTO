@@ -4,6 +4,7 @@ import { config } from "../env";
 import { BANNED_PHRASES, CTA_DEFAULT, EMAIL_LIMITS, SIGNALS, SPRINTO_FACTS, type SignalId, type VerdictResult } from "../rubric";
 import { allEvidence, type Facts } from "../facts";
 import { qualityGate, type GateResult } from "./qualityGate";
+import { assembleEmail, normalizeBody } from "../mail/layout";
 import type { PainPoint } from "./painPoints";
 
 export interface ActiveRule { id: number; kind: string; text: string }
@@ -30,45 +31,22 @@ export interface DraftResult {
   qualityGate: { passed: boolean; attempts: number; failures: string[][] };
 }
 
+/** The model writes the parts; code assembles the layout (lib/mail/layout.ts). */
 const ColdSchema = z.object({
   subject: z.string(),
-  body: z.string(),
+  hook: z.string(),
+  pain: z.string(),
+  value: z.string(),
+  cta: z.string(),
   hookSignalId: z.string(),
   hookQuote: z.string(),
   painPointIdsUsed: z.array(z.string()),
   rulesApplied: z.array(z.string()),
 });
 
-/**
- * Deterministic plain-text layout: greeting on its own line, one blank line between paragraphs,
- * signature (name + title) on its own lines at the end. Fixes drafts returned as one run-on line.
- */
+/** Back-compat: normalise free text into the standard layout. */
 export function formatEmailBody(raw: string, senderName: string, senderTitle: string): string {
-  let b = raw.replace(/\r\n/g, "\n").trim();
-  // Strip any signature the model wrote (we re-add it), wherever it ended up.
-  for (const s of [senderTitle, senderName]) {
-    const re = new RegExp(`[\\s,]*${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`);
-    b = b.replace(re, "").trim();
-  }
-  b = b.replace(/[\s,]*(Best|Thanks|Cheers|Regards|Best regards|Kind regards)[,.]?\s*$/i, "").trim();
-  // Greeting on its own line.
-  const g = /^(Hi [^,\n]+,)\s*/.exec(b);
-  let greeting = "";
-  if (g) { greeting = g[1]; b = b.slice(g[0].length).trim(); }
-  // If the body has no paragraph breaks, put each sentence group on its own paragraph:
-  // hook / pain (until "Sprinto") / value / CTA.
-  if (!/\n/.test(b)) {
-    const sentences = b.match(/[^.!?]+[.!?]+(\s|$)/g)?.map((x) => x.trim()) ?? [b];
-    const paras: string[] = [];
-    for (const s of sentences) {
-      const startNew = paras.length === 0 || /^Sprinto\b/.test(s) || /\?$/.test(s) || /^(Sprinto|Would|Open|Are|Could|Can|Worth|Happy)\b/.test(s);
-      if (startNew) paras.push(s); else paras[paras.length - 1] += ` ${s}`;
-    }
-    b = paras.join("\n\n");
-  } else {
-    b = b.replace(/\n{3,}/g, "\n\n");
-  }
-  return `${greeting ? `${greeting}\n\n` : ""}${b}\n\n${senderName}\n${senderTitle}`;
+  return normalizeBody(raw, senderName, senderTitle);
 }
 
 export function signature() {
@@ -105,16 +83,15 @@ export function allowedSourceText(ctx: Pick<DraftContext, "facts" | "contact" | 
   ].join("\n");
 }
 
-const COLD_SYSTEM = `You write short, specific B2B cold emails for Sprinto. Plain text only.
-STRUCTURE (exactly):
-1. Subject: <= 7 words, specific to them, no clickbait, no ALL CAPS, no "!".
-2. Greeting line: "Hi {firstName},"
-3. Hook (sentence 1): a specific, verifiable observation from the EVIDENCE (e.g. the GRC role they are hiring for, SOC 2 "in progress" on their trust page, SSO/audit logs on their enterprise plan, a recent funding/enterprise launch). Set hookSignalId to that signal id and hookQuote to the exact evidence quote you relied on (copy it verbatim from the evidence list).
-4. Pain (1-2 sentences): connect the hook to ONE pain point, phrased for the recipient's role.
-5. Value (1 sentence): how Sprinto helps, using ONLY the SPRINTO FACTS.
-6. CTA (1 sentence): one low-friction ask (${CTA_DEFAULT}).
-7. Signature: the exact signature given.
-HARD RULES: body <= ${EMAIL_LIMITS.COLD_MAX_WORDS} words. No invented numbers, statistics, customer names or case studies. Do not mention any company or product name that is not in the facts. Never use: ${BANNED_PHRASES.slice(0, 9).map((p) => `"${p}"`).join(", ")}. No emojis, no placeholders or brackets.
+const COLD_SYSTEM = `You write short, specific B2B cold emails for Sprinto, the way a thoughtful person would write to a busy executive.
+Return the email as SEPARATE PARTS (code adds the greeting "Hi {firstName}," and the sign-off/signature, so do NOT include them):
+- subject: <= 7 words, specific to them, no clickbait, no ALL CAPS, no "!".
+- hook: ONE sentence. A specific, verifiable observation from the EVIDENCE (e.g. the GRC role they are hiring for, SOC 2 "in progress" on their trust page, SSO/audit logs on their enterprise plan, a recent funding/enterprise launch). Set hookSignalId to that signal id and hookQuote to the exact evidence quote you relied on (verbatim from the evidence list).
+- pain: 1-2 sentences connecting the hook to ONE pain point, phrased for the recipient's role. Empathetic, not alarmist.
+- value: ONE sentence on how Sprinto helps, using ONLY the SPRINTO FACTS.
+- cta: ONE short, low-friction question (${CTA_DEFAULT}).
+Tone: warm, direct, respectful of their time. Short sentences. No jargon stacking.
+HARD RULES: all parts together <= ${EMAIL_LIMITS.COLD_MAX_WORDS - 12} words. No invented numbers, statistics, customer names or case studies. Do not mention any company or product name that is not in the facts. Never use: ${BANNED_PHRASES.slice(0, 9).map((p) => `"${p}"`).join(", ")}. No emojis, no placeholders or brackets.
 Apply every FEEDBACK RULE that is relevant and list their ids (e.g. "R3") in rulesApplied.`;
 
 export async function draftColdEmail(ctx: DraftContext): Promise<DraftResult> {
@@ -137,10 +114,7 @@ FEEDBACK RULES (from the Growth Lead — follow them):
 ${rulesBlock(ctx.rules)}
 
 HOOK PERFORMANCE SO FAR:
-${ctx.hookSummary}
-
-SIGNATURE (end the body with exactly this):
-${signature()}`;
+${ctx.hookSummary}`;
   return draftWithGate(ctx, COLD_SYSTEM, prompt, EMAIL_LIMITS.COLD_MAX_WORDS, true, "draft_cold");
 }
 
@@ -150,7 +124,9 @@ export async function draftFollowup(ctx: DraftContext & { followupNumber: 1 | 2;
     ? `Use a NEW angle: the second pain point (${ctx.painPoints[1]?.id ?? "n/a"}: ${ctx.painPoints[1]?.framing ?? ""}) or a different fired signal (${altSignals.join(", ") || "none"}). Never say "just bumping this" or reference the previous email as the main point. One CTA.`
     : `This is the final, short, polite close-the-loop note. Acknowledge timing may be off, leave the door open, one soft CTA. Still reference one specific fired signal as the hook.`;
   const system = `You write a short follow-up (#${ctx.followupNumber}) to a cold email from Sprinto, sent in the same thread. Plain text.
-Start with "Hi {firstName},". Body <= ${EMAIL_LIMITS.FOLLOWUP_MAX_WORDS} words, end with the exact signature. ${angle}
+Return SEPARATE PARTS (code adds "Hi {firstName}," and the sign-off/signature; do NOT include them):
+hook (one sentence, the new observation), pain (one sentence), value (one sentence, or "" for the final close-the-loop note), cta (one short question).
+All parts together <= ${EMAIL_LIMITS.FOLLOWUP_MAX_WORDS - 10} words. ${angle}
 Set hookSignalId + hookQuote (verbatim from the evidence list) for the observation you use. Subject: reuse "Re: <previous subject>".
 No invented numbers, names, stats or case studies. Only Sprinto claims from SPRINTO FACTS. Apply relevant FEEDBACK RULES and list their ids in rulesApplied.`;
   const prompt = `Recipient: ${ctx.contact.firstName}, ${ctx.contact.title} at ${ctx.companyName}
@@ -172,10 +148,7 @@ FEEDBACK RULES:
 ${rulesBlock(ctx.rules)}
 
 HOOK PERFORMANCE SO FAR:
-${ctx.hookSummary}
-
-SIGNATURE:
-${signature()}`;
+${ctx.hookSummary}`;
   const r = await draftWithGate(ctx, system, prompt, EMAIL_LIMITS.FOLLOWUP_MAX_WORDS, true, `draft_followup_${ctx.followupNumber}`);
   if (!/^re:/i.test(r.subject)) r.subject = `Re: ${ctx.previousSubject}`;
   return r;
@@ -183,13 +156,16 @@ ${signature()}`;
 
 async function draftWithGate(ctx: DraftContext, system: string, prompt: string, maxWords: number, requireHook: boolean, purpose: string): Promise<DraftResult> {
   const failures: string[][] = [];
-  let lastDraft: z.infer<typeof ColdSchema> | null = null;
+  let lastDraft: (z.infer<typeof ColdSchema> & { body: string }) | null = null;
   let gate: GateResult = { passed: false, failures: [] };
   const evidence = allEvidence(ctx.facts);
   for (let attempt = 1; attempt <= 2; attempt++) {
     const p: string = attempt === 1 ? prompt : `${prompt}\n\nYOUR PREVIOUS DRAFT FAILED THE QUALITY GATE:\n${failures[failures.length - 1].map((f) => `- ${f}`).join("\n")}\n\nPrevious draft:\nSubject: ${lastDraft?.subject}\n${lastDraft?.body}\n\nRewrite it fixing every failure.`;
-    const d: z.infer<typeof ColdSchema> = await generateJson({ slot: "smart", purpose: `${purpose}#${attempt}`, system, prompt: p, schema: ColdSchema, temperature: 0.7, meter: ctx.meter });
-    d.body = formatEmailBody(d.body, config.senderName, config.senderTitle);
+    const parts: z.infer<typeof ColdSchema> = await generateJson({ slot: "smart", purpose: `${purpose}#${attempt}`, system, prompt: p, schema: ColdSchema, temperature: 0.7, meter: ctx.meter });
+    const d = {
+      ...parts,
+      body: assembleEmail({ firstName: ctx.contact.firstName, paragraphs: [parts.hook, parts.pain, parts.value, parts.cta], senderName: config.senderName, senderTitle: config.senderTitle }),
+    };
     lastDraft = d;
     gate = qualityGate({
       subject: d.subject, body: d.body, firstName: ctx.contact.firstName, hookSignalId: d.hookSignalId, hookQuote: d.hookQuote,

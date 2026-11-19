@@ -6,14 +6,33 @@ const firstName = (s: State) => (s.contactName || "there").split(" ")[0];
 
 // ───────────── Short, deterministic reply templates (no invented facts) ─────────────
 export const templates = {
-  propose: (s: State, d: AgentDeps, slots: string[], taken: boolean) =>
-    `Hi ${firstName(s)},\n\n${taken ? "Apologies — that slot was just taken on my side. " : s.negotiationRound > 0 ? "No problem. " : "Great to hear from you. "}Would either of these work for a 30-minute call?\n\n- ${slots.map((x) => d.formatSlot(x)).join("\n- ")}\n\nIf neither suits, just send a time that works for you${d.bookingLink(null) ? ` or pick one here: ${d.bookingLink(null)}` : ""}.\n\n${d.config.senderName}`.replace("30-minute", `${d.config.meetingMinutes}-minute`),
-  confirm: (s: State, d: AgentDeps, slot: string) =>
-    `Hi ${firstName(s)},\n\nConfirmed for ${d.formatSlot(slot)} — looking forward to it.${d.bookingLink(slot) ? `\n\nTo get the calendar invite, please lock in that time here: ${d.bookingLink(slot)}` : ""}\n\n${d.config.senderName}`,
-  decline: (s: State, d: AgentDeps) =>
-    `Hi ${firstName(s)},\n\nThanks for letting me know — completely understand. I won't follow up further for now. If audit readiness becomes a priority later, I'm happy to help.\n\n${d.config.senderName}`,
-  clarify: (s: State, d: AgentDeps) =>
-    `Hi ${firstName(s)},\n\nThanks for the reply — just to make sure I understand: would you be open to a short ${d.config.meetingMinutes}-minute call, and if so, is there a day that suits you best?\n\n${d.config.senderName}`,
+  propose: (s: State, d: AgentDeps, slots: string[], taken: boolean) => [
+    `Hi ${firstName(s)},`,
+    taken ? "Apologies, that slot was just taken on my side." : s.negotiationRound > 0 ? "No problem at all, thanks for letting me know." : "Great to hear from you, thanks for getting back to me.",
+    `Would either of these work for a ${d.config.meetingMinutes}-minute call?\n${slots.map((x) => `• ${d.formatSlot(x)}`).join("\n")}`,
+    `If neither suits, just reply with a time that works for you${d.bookingLink(null) ? `, or pick one here: ${d.bookingLink(null)}` : "."}`,
+    d.config.senderName,
+  ].join("\n\n"),
+  confirm: (s: State, d: AgentDeps, slot: string, booked = false) => [
+    `Hi ${firstName(s)},`,
+    `Confirmed for ${d.formatSlot(slot)}, looking forward to it.`,
+    booked
+      ? "You'll receive a calendar invite with the video link shortly."
+      : d.bookingLink(slot) ? `To get the calendar invite, please lock in that time here: ${d.bookingLink(slot)}` : "",
+    d.config.senderName,
+  ].filter(Boolean).join("\n\n"),
+  decline: (s: State, d: AgentDeps) => [
+    `Hi ${firstName(s)},`,
+    "Thanks for letting me know, completely understand.",
+    "I won't follow up further for now. If audit readiness becomes a priority later, I'd be happy to help.",
+    d.config.senderName,
+  ].join("\n\n"),
+  clarify: (s: State, d: AgentDeps) => [
+    `Hi ${firstName(s)},`,
+    "Thanks for the reply. Just to make sure I understand:",
+    `would you be open to a short ${d.config.meetingMinutes}-minute call, and if so, is there a day that suits you best?`,
+    d.config.senderName,
+  ].join("\n\n"),
 };
 
 function h(node: string, action: string, result: string, now: Date): HistoryEntry {
@@ -122,7 +141,7 @@ export function buildGraph(d: AgentDeps, checkpointer?: BaseCheckpointSaver) {
     }))
 
     .addNode("sendConfirmation", node("sendConfirmation", async (s) => {
-      const { r, ids } = await sendTracked(s, "confirmation", templates.confirm(s, d, s.slotToBook!));
+      const { r, ids } = await sendTracked(s, "confirmation", templates.confirm(s, d, s.slotToBook!, !!s.calendarEventId && !s.calendarEventId.startsWith("calendly-link:")));
       return {
         agentSentMessageIds: ids, lastActivityAt: d.now().toISOString(), inputNeeded: false, inputNeededReason: null,
         crmPending: { status: "MEETING_BOOKED", stage: "booked", outcome: "booked" },

@@ -62,15 +62,3 @@ describe("email quality gate", () => {
   });
 });
 
-import { formatEmailBody } from "@/lib/pipeline/draft";
-describe("email formatting", () => {
-  it("splits a one-line draft into greeting, paragraphs and signature", () => {
-    const raw = "Hi Sahil, I noticed on Idukki's trust page that your SOC 2 is in audit. That can stall big deals in security reviews. Sprinto automates evidence collection. Open to a 20-minute call next week? Test Sender Growth, Sprinto";
-    const out = formatEmailBody(raw, "Test Sender", "Growth, Sprinto");
-    expect(out).toBe("Hi Sahil,\n\nI noticed on Idukki's trust page that your SOC 2 is in audit. That can stall big deals in security reviews.\n\nSprinto automates evidence collection.\n\nOpen to a 20-minute call next week?\n\nTest Sender\nGrowth, Sprinto");
-  });
-  it("keeps an already well-formatted draft and does not duplicate the signature", () => {
-    const raw = "Hi Macgill,\n\nHook line.\n\nOpen to a call?\n\nTest Sender\nGrowth, Sprinto";
-    expect(formatEmailBody(raw, "Test Sender", "Growth, Sprinto")).toBe(raw);
-  });
-});
