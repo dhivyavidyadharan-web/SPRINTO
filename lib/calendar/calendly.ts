@@ -27,17 +27,18 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 const norm = (u: string) => u.replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase();
 
-let eventTypeCache: { uri: string; schedulingUrl: string; duration: number } | null = null;
+type Loc = { kind: string; location?: string | null };
+let eventTypeCache: { uri: string; schedulingUrl: string; duration: number; locations: Loc[] } | null = null;
 
 /** Resolve the Calendly event type matching CALENDLY_URL (or the first active one). */
 export async function eventType() {
   if (eventTypeCache) return eventTypeCache;
   const me = await call<{ resource: { uri: string } }>("/users/me");
-  const types = await call<{ collection: { uri: string; scheduling_url: string; active: boolean; duration: number }[] }>(`/event_types?user=${encodeURIComponent(me.resource.uri)}&count=100`);
+  const types = await call<{ collection: { uri: string; scheduling_url: string; active: boolean; duration: number; locations?: Loc[] | null }[] }>(`/event_types?user=${encodeURIComponent(me.resource.uri)}&count=100`);
   const active = types.collection.filter((t) => t.active);
   const match = (config.calendlyUrl && active.find((t) => norm(t.scheduling_url) === norm(config.calendlyUrl))) || active[0];
   if (!match) throw new CalendlyError("No active Calendly event type found", 404);
-  eventTypeCache = { uri: match.uri, schedulingUrl: match.scheduling_url, duration: match.duration };
+  eventTypeCache = { uri: match.uri, schedulingUrl: match.scheduling_url, duration: match.duration, locations: match.locations ?? [] };
   return eventTypeCache;
 }
 
@@ -94,6 +95,8 @@ export async function bookSlot(p: { slotIso: string; contactName: string; compan
           event_type: et.uri,
           start_time: new Date(p.slotIso).toISOString(),
           invitee: { name: `${p.contactName} (live test)`, email: config.myEmail, timezone: config.timezone },
+          // Event types with a configured location (e.g. Google Meet) require it on API bookings.
+          ...(et.locations[0] ? { location: { kind: et.locations[0].kind, ...(et.locations[0].location ? { location: et.locations[0].location } : {}) } } : {}),
         }),
       });
       return { eventId: r.resource.event ?? r.resource.uri, mode: "api" };

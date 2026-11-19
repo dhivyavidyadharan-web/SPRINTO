@@ -174,3 +174,16 @@ describe("reply & scheduling agent", () => {
     expect(h.events).toHaveLength(0);
   });
 });
+
+describe("first reply proposes a time (regression: rize.io live test)", () => {
+  it("is treated as interest, books it, and does not use a negotiation round", async () => {
+    const h = harness({ classify: [cls("counter_proposal", { prospectProposedTime: "2026-11-20T08:30:00.000Z" })] });
+    await h.start();
+    await h.reply("I am free on 20 nov, 2pm. Love to chat more");
+    const s = await h.state();
+    expect(s.replyStatus).toBe("interested");
+    expect(s.negotiationRound).toBe(0);
+    expect(s.meetingStatus).toBe("confirmed");
+    expect(h.crm.at(-1)).toBe("MEETING_BOOKED");
+  });
+});

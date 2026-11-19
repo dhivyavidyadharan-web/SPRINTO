@@ -45,7 +45,9 @@ export function buildGraph(d: AgentDeps, checkpointer?: BaseCheckpointSaver) {
     .addNode("classifyReply", node("classifyReply", async (s) => {
       const ev = s.lastEvent as Extract<ResumeEvent, { type: "reply" }>;
       const c = await d.classify(ev.replyText, s);
-      const status = c.confidence < 0.6 ? "unclear" : c.replyStatus;
+      let status = c.confidence < 0.6 ? "unclear" : c.replyStatus;
+      // A time proposed before we offered any slots is interest, not a counter-offer: no round is used.
+      if (status === "counter_proposal" && s.timesProposed.length === 0) status = "interested";
       const upd: StateUpdate = {
         replyStatus: status, prospectProposedTime: c.prospectProposedTime, acceptedSlot: c.acceptedSlot && s.timesProposed.includes(c.acceptedSlot) ? c.acceptedSlot : null,
         declineReason: c.declineReason, lastReplyText: ev.replyText, lastRfcMessageId: ev.rfcMessageId ?? s.lastRfcMessageId,
