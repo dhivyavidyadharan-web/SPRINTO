@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1820" height="1080" viewBox="0 0 1820 1080" font-family="Segoe UI, Inter, Arial, sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f2d4a"/>
+    </marker>
+    <filter id="sh" x="-5%" y="-5%" width="110%" height="120%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.12"/></filter>
+  </defs>
+  <rect width="1820" height="1080" fill="#ffffff"/>
+  <text x="910" y="52" text-anchor="middle" font-size="34" font-weight="700" fill="#14213d">Case 2 · Sprinto Autonomous Outbound Agent — Components Map</text>
+
+  <!-- lanes -->
+  <rect x="215" y="155" width="1585" height="195" fill="#e8f0fe"/>
+  <rect x="215" y="350" width="1585" height="170" fill="#eaf7ee"/>
+  <rect x="215" y="520" width="1585" height="170" fill="#fff9e3"/>
+  <rect x="215" y="690" width="1585" height="170" fill="#fdeef5"/>
+  <rect x="215" y="860" width="1585" height="190" fill="#eef1fb"/>
+  <!-- column guides -->
+  <g stroke="#ffffff" stroke-width="2">
+    <line x1="480" y1="85" x2="480" y2="1050"/><line x1="735" y1="85" x2="735" y2="1050"/><line x1="1000" y1="85" x2="1000" y2="1050"/>
+    <line x1="1275" y1="85" x2="1275" y2="1050"/><line x1="1535" y1="85" x2="1535" y2="1050"/>
+  </g>
+
+  <!-- header -->
+  <rect x="20" y="85" width="1780" height="70" rx="8" fill="#14213d"/>
+  <g font-size="22" fill="#ffffff" text-anchor="middle" font-weight="600">
+    <text x="117" y="128">Actor</text><text x="347" y="128">Trigger</text><text x="607" y="128">Input</text>
+    <text x="867" y="128">Context</text><text x="1137" y="128">Processing</text><text x="1405" y="128">AI</text><text x="1667" y="128">Output</text>
+  </g>
+
+  <!-- actor column -->
+  <rect x="20" y="155" width="195" height="895" fill="#14213d"/>
+  <g fill="#ffffff" text-anchor="middle">
+    <line x1="20" y1="350" x2="215" y2="350" stroke="#2d3b5c"/><line x1="20" y1="520" x2="215" y2="520" stroke="#2d3b5c"/>
+    <line x1="20" y1="690" x2="215" y2="690" stroke="#2d3b5c"/><line x1="20" y1="860" x2="215" y2="860" stroke="#2d3b5c"/>
+    <text x="117" y="245" font-size="23" font-weight="700">Growth Lead</text><text x="117" y="275" font-size="17" opacity=".85">(User)</text>
+    <text x="117" y="428" font-size="23" font-weight="700">Data Sources</text><text x="117" y="456" font-size="16" opacity=".85">(Web · News · Hunter)</text>
+    <text x="117" y="598" font-size="23" font-weight="700">System</text><text x="117" y="626" font-size="16" opacity=".85">(Next.js backend + cron)</text>
+    <text x="117" y="768" font-size="23" font-weight="700">AI Models</text><text x="117" y="796" font-size="16" opacity=".85">(Gemini + LangGraph)</text>
+    <text x="117" y="945" font-size="23" font-weight="700">Email &amp; Calendar</text><text x="117" y="973" font-size="16" opacity=".85">(Gmail · Calendly)</text>
+  </g>
+
+  <!-- boxes -->
+  <g font-size="17" fill="#1b1b1b" text-anchor="middle">
+    <!-- B1 trigger -->
+    <rect x="230" y="195" width="235" height="120" rx="10" fill="#e4e1fb" stroke="#4b3fd6" stroke-width="2.5" filter="url(#sh)"/>
+    <text x="347" y="232">Adds a company website</text><text x="347" y="255">(search bar or CSV)</text><text x="347" y="282" font-size="15" fill="#444">or daily cron re-queues</text><text x="347" y="302" font-size="15" fill="#444">revisit dates</text>
+    <!-- B2 input -->
+    <rect x="497" y="205" width="222" height="100" rx="10" fill="#e3eefc" stroke="#2f6fd6" stroke-width="2.5" filter="url(#sh)"/>
+    <text x="608" y="245">Company domain</text><text x="608" y="270">+ optional contacts CSV</text>
+    <!-- B3 context -->
+    <rect x="750" y="368" width="236" height="135" rx="10" fill="#dff3e4" stroke="#2f9e57" stroke-width="2.5" filter="url(#sh)"/>
+    <text x="868" y="398">Reads website pages</text><text x="868" y="420" font-size="15" fill="#444">(robots.txt respected, no bot-wall</text><text x="868" y="439" font-size="15" fill="#444">bypass), Google News headlines,</text><text x="868" y="458" font-size="15" fill="#444">Hunter contacts</text><text x="868" y="486" font-size="15" fill="#2f6b43">AI pulls facts with exact quotes</text>
+    <!-- B4 processing -->
+    <rect x="1013" y="535" width="250" height="140" rx="10" fill="#fdeec0" stroke="#e0a21a" stroke-width="2.5" filter="url(#sh)"/>
+    <text x="1138" y="566">Rubric in code: 5 gates</text><text x="1138" y="590">+ timing &amp; fit signals</text><text x="1138" y="614">→ Qualified / Nurture / Not a fit</text><text x="1138" y="640" font-size="15" fill="#444">picks decision-maker, two pain</text><text x="1138" y="659" font-size="15" fill="#444">points, email quality gate</text>
+    <!-- B5 AI -->
+    <rect x="1290" y="702" width="232" height="146" rx="10" fill="#fbe0ee" stroke="#d6358a" stroke-width="2.5" filter="url(#sh)"/>
+    <text x="1406" y="732">Writes personalised</text><text x="1406" y="755">cold email + follow-ups;</text><text x="1406" y="778">reads replies and runs the</text><text x="1406" y="801">scheduling conversation</text><text x="1406" y="828" font-size="15" fill="#444">(book · decline · hand to you)</text>
+    <!-- B6 email/calendar -->
+    <rect x="1013" y="885" width="250" height="140" rx="10" fill="#e3eefc" stroke="#2f6fd6" stroke-width="2.5" filter="url(#sh)"/>
+    <text x="1138" y="917">Sends via Gmail SMTP</text><text x="1138" y="940" font-size="15" fill="#b42318" font-weight="600">(live test: only to MY_EMAIL)</text><text x="1138" y="966">reads replies via IMAP,</text><text x="1138" y="990">books the slot in Calendly</text>
+    <!-- B7 output dashboard -->
+    <rect x="1550" y="172" width="236" height="160" rx="10" fill="#fde4e1" stroke="#e0402d" stroke-width="2.5" filter="url(#sh)"/>
+    <text x="1668" y="204">Dashboard: decision log</text><text x="1668" y="228">per company with quotes,</text><text x="1668" y="252">meetings, cold deals,</text><text x="1668" y="276">Input needed queue</text><text x="1668" y="304" font-size="15" fill="#444">(one-click actions)</text>
+    <!-- B8 learning loop -->
+    <rect x="1550" y="535" width="236" height="140" rx="10" fill="#ece4fb" stroke="#7a4fd6" stroke-width="2.5" filter="url(#sh)"/>
+    <text x="1668" y="566">Learning loop</text><text x="1668" y="591" font-size="15" fill="#444">your feedback + reply outcomes</text><text x="1668" y="611" font-size="15" fill="#444">→ writing rules, A/B tests,</text><text x="1668" y="631" font-size="15" fill="#444">rubric suggestions</text><text x="1668" y="655" font-size="15" fill="#5b3fae">(rubric changes need your OK)</text>
+  </g>
+
+  <!-- arrows -->
+  <g fill="none" stroke="#1f2d4a" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#ah)">
+    <path d="M465,255 L494,255"/>
+    <path d="M719,255 L740,255 L740,435 L747,435"/>
+    <path d="M986,435 L1000,435 L1000,605 L1010,605"/>
+    <path d="M1263,605 L1330,605 L1330,699"/>
+    <path d="M1290,775 L1138,775 L1138,882"/>
+    <path d="M1263,955 L1535,955 L1535,252 L1547,252"/>
+    <path d="M1700,332 L1700,532"/>
+    <path d="M1668,675 L1668,775 L1525,775"/>
+  </g>
+  <g font-size="14" fill="#1f2d4a" font-style="italic">
+    <text x="1710" y="440">feedback &amp;</text><text x="1710" y="458">approvals</text>
+    <text x="1560" y="765">rules &amp; tests</text>
+    <text x="1545" y="900">replies, bookings</text>
+  </g>
+</svg>
